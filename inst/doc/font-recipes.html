@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+
+
+<title>Font recipes</title>
+
+<script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
+// be compatible with the behavior of Pandoc < 2.8).
+document.addEventListener('DOMContentLoaded', function(e) {
+  var hs = document.querySelectorAll("div.section[class*='level'] > :first-child");
+  var i, h, a;
+  for (i = 0; i < hs.length; i++) {
+    h = hs[i];
+    if (!/^h[1-6]$/i.test(h.tagName)) continue;  // it should be a header h1-h6
+    a = h.attributes;
+    while (a.length > 0) h.removeAttribute(a[0].name);
+  }
+});
+</script>
+
+<style type="text/css">
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+</style>
+
+
+
+<style type="text/css">
+code {
+white-space: pre;
+}
+.sourceCode {
+overflow: visible;
+}
+</style>
+<style type="text/css" data-origin="pandoc">
+html { -webkit-text-size-adjust: 100%; }
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+{ counter-reset: source-line 0; }
+pre.numberSource code > span
+{ position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+{ content: counter(source-line);
+position: relative; left: -1em; text-align: right; vertical-align: baseline;
+border: none; display: inline-block;
+-webkit-touch-callout: none; -webkit-user-select: none;
+-khtml-user-select: none; -moz-user-select: none;
+-ms-user-select: none; user-select: none;
+padding: 0 4px; width: 4em;
+color: #aaaaaa;
+}
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa; padding-left: 4px; }
+div.sourceCode
+{ }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } 
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.at { color: #7d9029; } 
+code span.bn { color: #40a070; } 
+code span.bu { color: #008000; } 
+code span.cf { color: #007020; font-weight: bold; } 
+code span.ch { color: #4070a0; } 
+code span.cn { color: #880000; } 
+code span.co { color: #60a0b0; font-style: italic; } 
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.do { color: #ba2121; font-style: italic; } 
+code span.dt { color: #902000; } 
+code span.dv { color: #40a070; } 
+code span.er { color: #ff0000; font-weight: bold; } 
+code span.ex { } 
+code span.fl { color: #40a070; } 
+code span.fu { color: #06287e; } 
+code span.im { color: #008000; font-weight: bold; } 
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } 
+code span.kw { color: #007020; font-weight: bold; } 
+code span.op { color: #666666; } 
+code span.ot { color: #007020; } 
+code span.pp { color: #bc7a00; } 
+code span.sc { color: #4070a0; } 
+code span.ss { color: #bb6688; } 
+code span.st { color: #4070a0; } 
+code span.va { color: #19177c; } 
+code span.vs { color: #4070a0; } 
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } 
+</style>
+<script>
+// apply pandoc div.sourceCode style to pre.sourceCode instead
+(function() {
+  var sheets = document.styleSheets;
+  for (var i = 0; i < sheets.length; i++) {
+    if (sheets[i].ownerNode.dataset["origin"] !== "pandoc") continue;
+    try { var rules = sheets[i].cssRules; } catch (e) { continue; }
+    var j = 0;
+    while (j < rules.length) {
+      var rule = rules[j];
+      // check if there is a div.sourceCode rule
+      if (rule.type !== rule.STYLE_RULE || rule.selectorText !== "div.sourceCode") {
+        j++;
+        continue;
+      }
+      var style = rule.style.cssText;
+      // check if color or background-color is set
+      if (rule.style.color === '' && rule.style.backgroundColor === '') {
+        j++;
+        continue;
+      }
+      // replace div.sourceCode by a pre.sourceCode rule
+      sheets[i].deleteRule(j);
+      sheets[i].insertRule('pre.sourceCode{' + style + '}', j);
+    }
+  }
+})();
+</script>
+
+
+
+
+<style type="text/css">body {
+background-color: #fff;
+margin: 1em auto;
+max-width: 700px;
+overflow: visible;
+padding-left: 2em;
+padding-right: 2em;
+font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+font-size: 14px;
+line-height: 1.35;
+}
+#TOC {
+clear: both;
+margin: 0 0 10px 10px;
+padding: 4px;
+width: 400px;
+border: 1px solid #CCCCCC;
+border-radius: 5px;
+background-color: #f6f6f6;
+font-size: 13px;
+line-height: 1.3;
+}
+#TOC .toctitle {
+font-weight: bold;
+font-size: 15px;
+margin-left: 5px;
+}
+#TOC ul {
+padding-left: 40px;
+margin-left: -1.5em;
+margin-top: 5px;
+margin-bottom: 5px;
+}
+#TOC ul ul {
+margin-left: -2em;
+}
+#TOC li {
+line-height: 16px;
+}
+table {
+margin: 1em auto;
+border-width: 1px;
+border-color: #DDDDDD;
+border-style: outset;
+border-collapse: collapse;
+}
+table th {
+border-width: 2px;
+padding: 5px;
+border-style: inset;
+}
+table td {
+border-width: 1px;
+border-style: inset;
+line-height: 18px;
+padding: 5px 5px;
+}
+table, table th, table td {
+border-left-style: none;
+border-right-style: none;
+}
+table thead, table tr.even {
+background-color: #f7f7f7;
+}
+p {
+margin: 0.5em 0;
+}
+blockquote {
+background-color: #f6f6f6;
+padding: 0.25em 0.75em;
+}
+hr {
+border-style: solid;
+border: none;
+border-top: 1px solid #777;
+margin: 28px 0;
+}
+dl {
+margin-left: 0;
+}
+dl dd {
+margin-bottom: 13px;
+margin-left: 13px;
+}
+dl dt {
+font-weight: bold;
+}
+ul {
+margin-top: 0;
+}
+ul li {
+list-style: circle outside;
+}
+ul ul {
+margin-bottom: 0;
+}
+pre, code {
+background-color: #f7f7f7;
+border-radius: 3px;
+color: #333;
+white-space: pre-wrap; 
+}
+pre {
+border-radius: 3px;
+margin: 5px 0px 10px 0px;
+padding: 10px;
+}
+pre:not([class]) {
+background-color: #f7f7f7;
+}
+code {
+font-family: Consolas, Monaco, 'Courier New', monospace;
+font-size: 85%;
+}
+p > code, li > code {
+padding: 2px 0px;
+}
+div.figure {
+text-align: center;
+}
+img {
+background-color: #FFFFFF;
+padding: 2px;
+border: 1px solid #DDDDDD;
+border-radius: 3px;
+border: 1px solid #CCCCCC;
+margin: 0 5px;
+}
+h1 {
+margin-top: 0;
+font-size: 35px;
+line-height: 40px;
+}
+h2 {
+border-bottom: 4px solid #f7f7f7;
+padding-top: 10px;
+padding-bottom: 2px;
+font-size: 145%;
+}
+h3 {
+border-bottom: 2px solid #f7f7f7;
+padding-top: 10px;
+font-size: 120%;
+}
+h4 {
+border-bottom: 1px solid #f7f7f7;
+margin-left: 8px;
+font-size: 105%;
+}
+h5, h6 {
+border-bottom: 1px solid #ccc;
+font-size: 105%;
+}
+a {
+color: #0033dd;
+text-decoration: none;
+}
+a:hover {
+color: #6666ff; }
+a:visited {
+color: #800080; }
+a:visited:hover {
+color: #BB00BB; }
+a[href^="http:"] {
+text-decoration: underline; }
+a[href^="https:"] {
+text-decoration: underline; }
+
+code > span.kw { color: #555; font-weight: bold; } 
+code > span.dt { color: #902000; } 
+code > span.dv { color: #40a070; } 
+code > span.bn { color: #d14; } 
+code > span.fl { color: #d14; } 
+code > span.ch { color: #d14; } 
+code > span.st { color: #d14; } 
+code > span.co { color: #888888; font-style: italic; } 
+code > span.ot { color: #007020; } 
+code > span.al { color: #ff0000; font-weight: bold; } 
+code > span.fu { color: #900; font-weight: bold; } 
+code > span.er { color: #a61717; background-color: #e3d2d2; } 
+</style>
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<h1 class="title toc-ignore">Font recipes</h1>
+
+
+
+<div id="measurement-vs-rendering" class="section level2">
+<h2>Measurement vs rendering</h2>
+<p>Using fonts with ‘munch’ involves two independent steps:</p>
+<ol style="list-style-type: decimal">
+<li><p><strong>Measurement</strong>, ‘munch’ calls
+<code>gdtools::strings_sizes()</code> to compute text metrics (width,
+ascent, descent). Under the hood, ‘systemfonts’ locates the font file,
+then Cairo calculates the metrics. Any font registered via
+<code>systemfonts::register_font()</code>,
+<code>gdtools::register_gfont()</code>,
+<code>gdtools::font_set()</code>,
+<code>gdtools::font_set_liberation()</code> or
+<code>gdtools::font_set_auto()</code> is found at measurement
+time.</p></li>
+<li><p><strong>Rendering</strong>, the graphic device draws the text.
+Each device has its own way of resolving font names. This is where
+mismatches happen: a font that measurement found may be invisible to the
+device, or vice versa.</p></li>
+</ol>
+<p>When both steps find the same font, the output is correct. When they
+disagree, text is positioned using one font’s metrics but drawn with
+another ; leading to overlapping, clipping or misaligned labels.</p>
+</div>
+<div id="which-devices-agree-with-measurement" class="section level2">
+<h2>Which devices agree with measurement?</h2>
+<table>
+<colgroup>
+<col width="27%" />
+<col width="24%" />
+<col width="48%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Device family</th>
+<th>Font lookup</th>
+<th>Agrees with measurement?</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>ragg, svglite, ggiraph</td>
+<td>‘systemfonts’</td>
+<td>Always, same lookup on both sides</td>
+</tr>
+<tr class="even">
+<td><code>cairo_pdf()</code>, <code>png(type = &quot;cairo&quot;)</code></td>
+<td>fontconfig</td>
+<td>Only for system-installed fonts</td>
+</tr>
+<tr class="odd">
+<td><code>pdf()</code>, <code>png()</code>, <code>jpeg()</code></td>
+<td>Own engine</td>
+<td>No guarantee, needs ‘extrafont’</td>
+</tr>
+</tbody>
+</table>
+<div id="systemfonts-devices-recommended" class="section level3">
+<h3>systemfonts devices (recommended)</h3>
+<p>Devices from ragg, svglite and ggiraph use ‘systemfonts’ for both
+measurement and rendering. Every registered font is visible on both
+sides.</p>
+<p>The simplest approach is <code>font_set_liberation()</code>, which
+registers Liberation Sans, Serif and Mono in a single call, no internet
+needed, SIL Open Font License:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(gdtools)</span>
+<span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">font_set_liberation</span>()</span></code></pre></div>
+<p>For system-aware detection (Arial, Helvetica, etc. with Liberation as
+fallback), use <code>font_set_auto()</code>:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" tabindex="-1"></a><span class="fu">font_set_auto</span>()</span></code></pre></div>
+<p>For specific fonts (e.g. a Google Font), use
+<code>font_set()</code>:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="fu">library</span>(munch)</span>
+<span id="cb3-2"><a href="#cb3-2" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
+<span id="cb3-3"><a href="#cb3-3" tabindex="-1"></a></span>
+<span id="cb3-4"><a href="#cb3-4" tabindex="-1"></a>fonts <span class="ot">&lt;-</span> <span class="fu">font_set</span>(<span class="at">sans =</span> <span class="fu">font_google</span>(<span class="st">&quot;Open Sans&quot;</span>))</span>
+<span id="cb3-5"><a href="#cb3-5" tabindex="-1"></a></span>
+<span id="cb3-6"><a href="#cb3-6" tabindex="-1"></a><span class="fu">ggplot</span>(mtcars, <span class="fu">aes</span>(mpg, wt)) <span class="sc">+</span></span>
+<span id="cb3-7"><a href="#cb3-7" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb3-8"><a href="#cb3-8" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">&quot;**Open Sans** via *font_set()*&quot;</span>) <span class="sc">+</span></span>
+<span id="cb3-9"><a href="#cb3-9" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(<span class="at">base_family =</span> fonts<span class="sc">$</span>sans) <span class="sc">+</span></span>
+<span id="cb3-10"><a href="#cb3-10" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">plot.title =</span> <span class="fu">element_md</span>())</span></code></pre></div>
+</div>
+<div id="cairo-devices" class="section level3">
+<h3>Cairo devices</h3>
+<p>Cairo devices (<code>cairo_pdf()</code>,
+<code>png(type = &quot;cairo&quot;)</code>) use the same Cairo engine for
+rendering as ‘gdtools’ uses for measurement. However, font lookup
+differs: measurement goes through ‘systemfonts’, rendering goes through
+<strong>fontconfig</strong>. Fontconfig only scans system-installed
+fonts.</p>
+<p>This means:</p>
+<ul>
+<li><strong>System fonts</strong> (e.g. Arial, Helvetica), measurement
+and rendering agree. Everything works.</li>
+<li><strong>Google Fonts</strong> via <code>register_gfont()</code>,
+found by measurement but not necessarily by fontconfig, depending on
+where the cache is.</li>
+<li><strong>Liberation fonts</strong> via
+<code>font_set_liberation()</code> (or individual
+<code>register_liberation*()</code>), found by measurement only.
+Rendering falls back silently unless the fonts are also installed at the
+OS level.</li>
+</ul>
+<p>Use <code>font_family_exists(system_only = TRUE)</code> to check
+whether a font will be found by fontconfig:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">library</span>(gdtools)</span>
+<span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="co"># Found by measurement (systemfonts + registry)?</span></span>
+<span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="fu">font_family_exists</span>(<span class="st">&quot;sans&quot;</span>)</span>
+<span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="co">#&gt; [1] TRUE</span></span>
+<span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="co"># Found by fontconfig (system-installed only)?</span></span>
+<span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="fu">font_family_exists</span>(<span class="st">&quot;sans&quot;</span>, <span class="at">system_only =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
+</div>
+<div id="standard-r-devices-and-extrafont" class="section level3">
+<h3>Standard R devices and extrafont</h3>
+<p>Standard devices (<code>pdf()</code>, <code>png()</code>,
+<code>jpeg()</code>) use their own font engine and ignore ‘systemfonts’
+entirely.</p>
+<p>‘munch’ uses ‘gdtools’ (which relies on Cairo) for text measurement.
+The standard <code>pdf()</code> device uses its own font engine. For the
+output to be correct, the fonts used by ‘munch’ must also be known to
+<code>pdf()</code>.</p>
+<p>The ‘extrafont’ package bridges this gap: it imports TrueType fonts
+into R’s PDF device by generating font metric files that
+<code>pdf()</code> can use.</p>
+<p><strong>The key requirement</strong>: every font used in the plot
+must be available to both ‘systemfonts’ (for measurement) and
+<code>pdf()</code> (for rendering). If a font is registered with
+‘systemfonts’ but not with <code>pdf()</code>, the text metrics will not
+match the rendering and the output will have positioning errors.</p>
+<div id="example-exporting-a-munch-plot-to-pdf" class="section level4">
+<h4>Example: exporting a munch plot to PDF</h4>
+<div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a><span class="fu">library</span>(gdtools)</span>
+<span id="cb5-2"><a href="#cb5-2" tabindex="-1"></a><span class="fu">library</span>(munch)</span>
+<span id="cb5-3"><a href="#cb5-3" tabindex="-1"></a><span class="fu">library</span>(ggplot2)</span>
+<span id="cb5-4"><a href="#cb5-4" tabindex="-1"></a></span>
+<span id="cb5-5"><a href="#cb5-5" tabindex="-1"></a>df <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb5-6"><a href="#cb5-6" tabindex="-1"></a>  <span class="at">x =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>,</span>
+<span id="cb5-7"><a href="#cb5-7" tabindex="-1"></a>  <span class="at">y =</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">3</span>,</span>
+<span id="cb5-8"><a href="#cb5-8" tabindex="-1"></a>  <span class="at">label =</span> <span class="fu">c</span>(<span class="st">&quot;**Bold**&quot;</span>, <span class="st">&quot;*Italic*&quot;</span>, <span class="st">&quot;`Code`&quot;</span>)</span>
+<span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>)</span>
+<span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a></span>
+<span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a>p <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(df, <span class="fu">aes</span>(x, y, <span class="at">label =</span> label)) <span class="sc">+</span></span>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a>  <span class="fu">geom_label_md</span>(<span class="at">code_font_family =</span> <span class="st">&quot;Courier New&quot;</span>) <span class="sc">+</span></span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(<span class="at">base_family =</span> <span class="st">&quot;Arial&quot;</span>)</span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a></span>
+<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a><span class="co"># Make Arial and Courier New available to pdf()</span></span>
+<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a><span class="fu">library</span>(extrafont)</span>
+<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a><span class="co"># font_import()</span></span>
+<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a><span class="co"># Run font_import() once to scan system fonts,</span></span>
+<span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a><span class="co"># then loadfonts() in each session.</span></span>
+<span id="cb5-20"><a href="#cb5-20" tabindex="-1"></a><span class="fu">loadfonts</span>()</span>
+<span id="cb5-21"><a href="#cb5-21" tabindex="-1"></a></span>
+<span id="cb5-22"><a href="#cb5-22" tabindex="-1"></a><span class="co"># Suppress the device warning since we ensured font concordance</span></span>
+<span id="cb5-23"><a href="#cb5-23" tabindex="-1"></a><span class="fu">options</span>(<span class="at">munch.skip_device_check =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb5-24"><a href="#cb5-24" tabindex="-1"></a></span>
+<span id="cb5-25"><a href="#cb5-25" tabindex="-1"></a><span class="fu">pdf</span>(<span class="at">file =</span> <span class="st">&quot;munch-example.pdf&quot;</span>, <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">7</span>)</span>
+<span id="cb5-26"><a href="#cb5-26" tabindex="-1"></a><span class="fu">print</span>(p)</span>
+<span id="cb5-27"><a href="#cb5-27" tabindex="-1"></a><span class="fu">dev.off</span>()</span></code></pre></div>
+<p>The steps are:</p>
+<ol style="list-style-type: decimal">
+<li><strong>Install fonts at the system level</strong>, both “Arial” and
+“Courier New” must be installed as system fonts.</li>
+<li><strong>Import fonts once</strong> with
+<code>extrafont::font_import()</code>, this scans system fonts and
+creates metric files for <code>pdf()</code>. Only needed once.</li>
+<li><strong>Load fonts each session</strong> with
+<code>extrafont::loadfonts()</code>, this registers the imported fonts
+with <code>pdf()</code> for the current session.</li>
+<li><strong>Disable the device check</strong> with
+<code>options(munch.skip_device_check = TRUE)</code>, since you have
+ensured font concordance manually, the warning is no longer needed.</li>
+</ol>
+<blockquote>
+<p><strong>Note</strong>: <code>cairo_pdf()</code> is a simpler
+alternative. It uses Cairo for rendering (same engine as ‘gdtools’ for
+measurement), so system-installed fonts work without ‘extrafont’. Use
+<code>pdf()</code> + ‘extrafont’ only when <code>cairo_pdf()</code> is
+not available.</p>
+</blockquote>
+</div>
+</div>
+</div>
+<div id="font-sources-at-a-glance" class="section level2">
+<h2>Font sources at a glance</h2>
+<table>
+<colgroup>
+<col width="15%" />
+<col width="15%" />
+<col width="31%" />
+<col width="18%" />
+<col width="19%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th>Font source</th>
+<th>Measurement</th>
+<th>ragg / svglite / ggiraph</th>
+<th>Cairo devices</th>
+<th>pdf() / png()</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>System font</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Via extrafont</td>
+</tr>
+<tr class="even">
+<td><code>register_gfont()</code></td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Depends on cache location</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td><code>font_set_liberation()</code></td>
+<td>Yes</td>
+<td>Yes</td>
+<td>No (unless OS-installed)</td>
+<td>No</td>
+</tr>
+<tr class="even">
+<td><code>font_set_auto()</code></td>
+<td>Yes</td>
+<td>Yes</td>
+<td>System fonts only</td>
+<td>No</td>
+</tr>
+<tr class="odd">
+<td><code>font_set()</code></td>
+<td>Yes</td>
+<td>Yes</td>
+<td>System fonts only</td>
+<td>No</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="diagnosing-font-problems" class="section level2">
+<h2>Diagnosing font problems</h2>
+<p>When text looks wrong (wrong font, misaligned labels), the cause is
+almost always a measurement/rendering disagreement. Here is a quick
+checklist:</p>
+<ol style="list-style-type: decimal">
+<li><p><strong>Is the font found by measurement?</strong></p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>gdtools<span class="sc">::</span><span class="fu">font_family_exists</span>(<span class="st">&quot;My Font&quot;</span>)</span></code></pre></div>
+<p>If <code>FALSE</code>: the font is not registered with ‘systemfonts’.
+Register it with <code>register_gfont()</code>, <code>font_set()</code>,
+or <code>systemfonts::register_font()</code>.</p></li>
+<li><p><strong>Is the font found by the device?</strong></p>
+<ul>
+<li><p>For Cairo devices:</p>
+<div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>gdtools<span class="sc">::</span><span class="fu">font_family_exists</span>(<span class="st">&quot;My Font&quot;</span>, <span class="at">system_only =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
+<p>If <code>FALSE</code>: the font is not system-installed. Either
+install it at the OS level or switch to a ‘systemfonts’ device (ragg,
+svglite).</p></li>
+<li><p>For <code>pdf()</code>: check that
+<code>extrafont::fonts()</code> includes the family.</p></li>
+<li><p>For ragg/svglite/ggiraph: if step 1 passed, this always
+works.</p></li>
+</ul></li>
+<li><p><strong>Do both sides find the <em>same</em> font?</strong> Even
+when both find a font, it may not be the same file (e.g. a different
+weight or a substitution). Compare:</p>
+<div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="co"># What systemfonts resolves</span></span>
+<span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>systemfonts<span class="sc">::</span><span class="fu">match_fonts</span>(<span class="st">&quot;My Font&quot;</span>)</span>
+<span id="cb8-3"><a href="#cb8-3" tabindex="-1"></a></span>
+<span id="cb8-4"><a href="#cb8-4" tabindex="-1"></a><span class="co"># What&#39;s installed at the system level</span></span>
+<span id="cb8-5"><a href="#cb8-5" tabindex="-1"></a><span class="fu">subset</span>(systemfonts<span class="sc">::</span><span class="fu">system_fonts</span>(), family <span class="sc">==</span> <span class="st">&quot;My Font&quot;</span>)</span></code></pre></div></li>
+</ol>
+</div>
+
+
+
+<!-- code folding -->
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>
