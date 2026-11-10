@@ -29,7 +29,7 @@ Only graphics devices that support 'systemfonts' are compatible:
 supported when fonts are installed at the system level.
 Standard R devices (\code{\link[=pdf]{pdf()}}, \code{\link[=png]{png()}}, \code{\link[=jpeg]{jpeg()}}) are not compatible
 but can still produce correct output if fonts are made available
-to the device (e.g. via 'extrafont'). See the "Getting started" vignette
+to the device (e.g. via 'extrafont'). See \code{vignette("font-recipes")}
 for details.
 
 LaTeX and MathJax equations are not supported. For simple scientific
@@ -62,6 +62,11 @@ Useful links:
 }
 \author{
 \strong{Maintainer}: David Gohel \email{david.gohel@ardata.fr}
+
+Authors:
+\itemize{
+  \item David Gohel \email{david.gohel@ardata.fr}
+}
 
 Other contributors:
 \itemize{

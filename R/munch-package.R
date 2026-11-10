@@ -21,7 +21,7 @@
 #' supported when fonts are installed at the system level.
 #' Standard R devices ([pdf()], [png()], [jpeg()]) are not compatible
 #' but can still produce correct output if fonts are made available
-#' to the device (e.g. via 'extrafont'). See the "Getting started" vignette
+#' to the device (e.g. via 'extrafont'). See `vignette("font-recipes")`
 #' for details.
 #'
 #' LaTeX and MathJax equations are not supported. For simple scientific
@@ -50,7 +50,7 @@
 #' @importFrom grid gpar gTree gList textGrob unit viewport grid.layout
 #' @importFrom grid makeContext setChildren convertWidth convertHeight
 #' @importFrom grid nullGrob widthDetails heightDetails rectGrob rasterGrob
-#' @importFrom grid vpStack unit.c
+#' @importFrom grid vpStack unit.c unitType
 #' @importFrom gdtools strings_sizes
 #' @importFrom methods slot
 ## usethis namespace: end

@@ -8,7 +8,9 @@
 #' @param hjust Horizontal justification (0=left, 0.5=center, 1=right).
 #' @param vjust Vertical justification (0=bottom, 0.5=center, 1=top).
 #' @param width Maximum width in inches (NULL for no wrapping).
-#' @param line_spacing Line height multiplier (default 1.2).
+#' @param line_spacing Line height multiplier (default 1.2). When given, it
+#'   takes precedence over the `line_spacing` of `text_props`; when not given,
+#'   the value of `text_props` is used.
 #' @param text_props Text properties created with [default_text_props()].
 #'   If `NULL`, uses current defaults from [flextable::get_flextable_defaults()].
 #'   Use `img_baseline_ratio` in text_props to control image vertical alignment.
@@ -110,7 +112,9 @@ makeContent.mdGrob <- function(x) {
   total_width <- max(sapply(lines, function(l) l$width))
 
   # Container width for horizontal alignment
-  container_w <- if (!is.null(max_width) && is.numeric(max_width) && max_width > 0) {
+  container_w <- if (
+    !is.null(max_width) && is.numeric(max_width) && max_width > 0
+  ) {
     max_width
   } else {
     total_width
@@ -134,7 +138,11 @@ makeContent.mdGrob <- function(x) {
 
       # Render image chunks
       if (!is.null(chunk$img_path) && !is.na(chunk$img_path)) {
-        img_raster <- read_image_raster(chunk$img_path)
+        img_raster <- read_image_raster(
+          chunk$img_path,
+          width = chunk$img_width,
+          height = chunk$img_height
+        )
         if (!is.null(img_raster)) {
           # Position image with its bottom at (line_y - descent)
           # This accounts for the image descent defined in metrics
@@ -250,8 +258,6 @@ makeContent.mdGrob <- function(x) {
         name = paste0("chunk_", chunk$.chunk_index)
       )
 
-
-
       # Add highlight rect if needed
       # Use max glyph extents from systemfonts so the highlight covers
       # the full visual height of glyphs as rendered by ragg/systemfonts.
@@ -329,94 +335,128 @@ makeContent.mdGrob <- function(x) {
 #' @return List of lines, each with chunks, width, height, ascent, descent.
 #' @noRd
 arrange_chunks_into_lines <- function(chunks, max_width = NULL) {
-  lines <- list()
-  current_line <- list(
-    chunks = list(),
-    width = 0,
-    height = 0,
-    ascent = 0,
-    descent = 0,
-    max_ascend = 0,
-    max_descend = 0
-  )
-
-  for (i in seq_len(nrow(chunks))) {
-    chunk <- as.list(chunks[i, ])
-
-    # Check for newline
-    if (isTRUE(chunk$is_newline)) {
-      # Finish current line
-      if (length(current_line$chunks) > 0 || length(lines) == 0) {
-        if (current_line$height == 0) {
-          # Empty line - use chunk height
-          current_line$height <- chunk$height
-          current_line$ascent <- chunk$ascent
-          current_line$descent <- chunk$descent
-          current_line$max_ascend <- chunk$max_ascend
-          current_line$max_descend <- chunk$max_descend
-        }
-        lines <- c(lines, list(current_line))
-      }
-      # Start new line
-      current_line <- list(
-        chunks = list(),
-        width = 0,
-        height = 0,
-        ascent = 0,
-        descent = 0
-      )
-      next
-    }
-
-    # Check for wrapping
-    if (!is.null(max_width) && max_width > 0) {
-      if (
-        current_line$width + chunk$width > max_width &&
-          length(current_line$chunks) > 0
-      ) {
-        # Wrap to new line
-        lines <- c(lines, list(current_line))
-        current_line <- list(
-          chunks = list(),
-          width = 0,
-          height = 0,
-          ascent = 0,
-          descent = 0
-        )
-        # Skip leading spaces on new line
-        if (isTRUE(chunk$is_space)) {
-          next
-        }
-      }
-    }
-
-    # Add chunk to current line
-    current_line$chunks <- c(current_line$chunks, list(chunk))
-    current_line$width <- current_line$width + chunk$width
-    current_line$ascent <- max(current_line$ascent, chunk$ascent)
-    current_line$descent <- max(current_line$descent, chunk$descent)
-    current_line$height <- current_line$ascent + current_line$descent
-    current_line$max_ascend <- max(current_line$max_ascend, chunk$max_ascend)
-    current_line$max_descend <- max(current_line$max_descend, chunk$max_descend)
-  }
-
-  # Don't forget the last line
-  if (length(current_line$chunks) > 0) {
-    lines <- c(lines, list(current_line))
-  }
-
-  # Handle empty input
-  if (length(lines) == 0) {
-    lines <- list(list(
+  n <- nrow(chunks)
+  if (n == 0L) {
+    return(list(list(
       chunks = list(),
       width = 0,
       height = 0.2,
       ascent = 0.15,
       descent = 0.05
-    ))
+    )))
   }
 
-  lines
+  limit <- if (!is.null(max_width) && max_width > 0) max_width else Inf
+  chunks <- split_too_wide_words(chunks, limit)
+  chunks$.line <- flextable::layout_lines(
+    width = chunks$width,
+    newline = chunks$is_newline %in% TRUE,
+    space = chunks$is_space %in% TRUE,
+    max_width = limit,
+    break_before = chunks$.break_before %||% FALSE
+  )
+  chunks <- merge_word_pieces(chunks)
+  is_newline <- chunks$is_newline %in% TRUE
+  line_index <- chunks$.line
+
+  columns <- as.list(unclass(chunks))
+  attr(columns, "row.names") <- NULL
+  chunk_at <- function(i) lapply(columns, `[`, i)
+
+  kept <- which(line_index > 0L)
+  lapply(unname(split(kept, line_index[kept])), function(index) {
+    # a line with only a line break is an empty line: it gives the height
+    drawn <- index[!is_newline[index]]
+    list(
+      chunks = lapply(drawn, chunk_at),
+      width = sum(chunks$width[drawn]),
+      height = max(chunks$ascent[index]) + max(chunks$descent[index]),
+      ascent = max(chunks$ascent[index]),
+      descent = max(chunks$descent[index]),
+      max_ascend = max(chunks$max_ascend[index]),
+      max_descend = max(chunks$max_descend[index])
+    )
+  })
+}
+
+#' Split the words wider than a line into characters
+#'
+#' As in flextable, there is no hyphen and the word starts on a new line. Images,
+#' superscripts and subscripts are not split. The result has a column `.word` that
+#' gives the word of each piece, and `.break_before` for the first piece of a word.
+#'
+#' @param chunks Chunks data.frame with metrics.
+#' @param max_width Maximum line width in inches.
+#' @return The chunks data.frame.
+#' @noRd
+split_too_wide_words <- function(chunks, max_width) {
+  too_wide <- which(
+    chunks$width > max_width &
+      !chunks$is_newline %in% TRUE &
+      !chunks$is_space %in% TRUE &
+      is.na(chunks$img_path) &
+      !is.na(chunks$txt) &
+      !chunks$vertical.align %in% c("superscript", "subscript")
+  )
+  if (length(too_wide) == 0L) {
+    return(chunks)
+  }
+
+  txt <- chunks$txt[too_wide]
+  # a character and its combining marks must stay together
+  pieces <- regmatches(txt, gregexpr("\\X", txt, perl = TRUE))
+  times <- rep(1L, nrow(chunks))
+  times[too_wide] <- lengths(pieces)
+  word <- rep(seq_len(nrow(chunks)), times)
+
+  chunks <- chunks[word, , drop = FALSE]
+  rownames(chunks) <- NULL
+  chunks$.word <- word
+
+  is_piece <- word %in% too_wide
+  chunks$.break_before <- is_piece & !duplicated(word)
+  chunks$txt[is_piece] <- unlist(pieces)
+  chunks$width[is_piece] <- gdtools::strings_sizes(
+    x = chunks$txt[is_piece],
+    fontname = chunks$font.family[is_piece],
+    fontsize = chunks$font.size[is_piece],
+    bold = chunks$bold[is_piece],
+    italic = chunks$italic[is_piece]
+  )$width
+  chunks
+}
+
+#' Merge the pieces of a word that are on the same line
+#'
+#' They are drawn as one text, not as one text per character.
+#'
+#' @param chunks Chunks data.frame with columns `.word` and `.line`.
+#' @return The chunks data.frame, without the columns of the split.
+#' @noRd
+merge_word_pieces <- function(chunks) {
+  n <- nrow(chunks)
+  if (is.null(chunks$.word)) {
+    return(chunks)
+  }
+
+  follows <- c(
+    FALSE,
+    chunks$.word[-1L] == chunks$.word[-n] &
+      chunks$.line[-1L] == chunks$.line[-n]
+  )
+  groups <- split(seq_len(n), cumsum(!follows))
+  for (index in groups[lengths(groups) > 1L]) {
+    chunks$txt[index[1L]] <- paste(chunks$txt[index], collapse = "")
+    chunks$width[index[1L]] <- sum(chunks$width[index])
+  }
+
+  chunks <- chunks[!follows, , drop = FALSE]
+  rownames(chunks) <- NULL
+  chunks$.word <- NULL
+  chunks$.break_before <- NULL
+  # used to name the grobs, it must stay unique
+  chunks$.chunk_index <- seq_len(nrow(chunks))
+  chunks
 }
 
 #' @title Get Dimensions of a mdGrob

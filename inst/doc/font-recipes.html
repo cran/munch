@@ -348,8 +348,8 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 <li><p><strong>Measurement</strong>, ‘munch’ calls
 <code>gdtools::strings_sizes()</code> to compute text metrics (width,
 ascent, descent). Under the hood, ‘systemfonts’ locates the font file,
-then Cairo calculates the metrics. Any font registered via
-<code>systemfonts::register_font()</code>,
+then the metrics are read from this file with FreeType. Any font
+registered via <code>systemfonts::register_font()</code>,
 <code>gdtools::register_gfont()</code>,
 <code>gdtools::font_set()</code>,
 <code>gdtools::font_set_liberation()</code> or
@@ -362,7 +362,10 @@ device, or vice versa.</p></li>
 </ol>
 <p>When both steps find the same font, the output is correct. When they
 disagree, text is positioned using one font’s metrics but drawn with
-another ; leading to overlapping, clipping or misaligned labels.</p>
+another, leading to overlapping, clipping or misaligned labels.</p>
+<p>Even with the same font, measurement does not apply kerning while
+devices do: see the section “Alignment accuracy” of
+<code>vignette(&quot;using-ggplot2&quot;)</code>.</p>
 </div>
 <div id="which-devices-agree-with-measurement" class="section level2">
 <h2>Which devices agree with measurement?</h2>
@@ -391,9 +394,14 @@ another ; leading to overlapping, clipping or misaligned labels.</p>
 <td>Only for system-installed fonts</td>
 </tr>
 <tr class="odd">
-<td><code>pdf()</code>, <code>png()</code>, <code>jpeg()</code></td>
+<td><code>pdf()</code></td>
 <td>Own engine</td>
 <td>No guarantee, needs ‘extrafont’</td>
+</tr>
+<tr class="even">
+<td><code>png()</code>, <code>jpeg()</code> (default type)</td>
+<td>Depends on the system</td>
+<td>Only for system-installed fonts</td>
 </tr>
 </tbody>
 </table>
@@ -402,6 +410,11 @@ another ; leading to overlapping, clipping or misaligned labels.</p>
 <p>Devices from ragg, svglite and ggiraph use ‘systemfonts’ for both
 measurement and rendering. Every registered font is visible on both
 sides.</p>
+<p>With svglite and ggiraph, the SVG file names the fonts, and the text
+is finally drawn by the browser or the viewer, which needs these fonts
+too. ‘ggiraph’ can embed them with HTML dependencies (for example
+<code>liberationsansHtmlDependency()</code>), ‘svglite’ with its
+argument <code>web_fonts</code>.</p>
 <p>The simplest approach is <code>font_set_liberation()</code>, which
 registers Liberation Sans, Serif and Mono in a single call, no internet
 needed, SIL Open Font License:</p>
@@ -425,10 +438,9 @@ fallback), use <code>font_set_auto()</code>:</p>
 </div>
 <div id="cairo-devices" class="section level3">
 <h3>Cairo devices</h3>
-<p>Cairo devices (<code>cairo_pdf()</code>,
-<code>png(type = &quot;cairo&quot;)</code>) use the same Cairo engine for
-rendering as ‘gdtools’ uses for measurement. However, font lookup
-differs: measurement goes through ‘systemfonts’, rendering goes through
+<p>With Cairo devices (<code>cairo_pdf()</code>,
+<code>png(type = &quot;cairo&quot;)</code>), font lookup differs between the two
+steps: measurement goes through ‘systemfonts’, rendering goes through
 <strong>fontconfig</strong>. Fontconfig only scans system-installed
 fonts.</p>
 <p>This means:</p>
@@ -445,26 +457,38 @@ Rendering falls back silently unless the fonts are also installed at the
 OS level.</li>
 </ul>
 <p>Use <code>font_family_exists(system_only = TRUE)</code> to check
-whether a font will be found by fontconfig:</p>
+whether a font is installed at the system level:</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">library</span>(gdtools)</span>
 <span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a></span>
 <span id="cb4-3"><a href="#cb4-3" tabindex="-1"></a><span class="co"># Found by measurement (systemfonts + registry)?</span></span>
 <span id="cb4-4"><a href="#cb4-4" tabindex="-1"></a><span class="fu">font_family_exists</span>(<span class="st">&quot;sans&quot;</span>)</span>
 <span id="cb4-5"><a href="#cb4-5" tabindex="-1"></a><span class="co">#&gt; [1] TRUE</span></span>
 <span id="cb4-6"><a href="#cb4-6" tabindex="-1"></a></span>
-<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="co"># Found by fontconfig (system-installed only)?</span></span>
+<span id="cb4-7"><a href="#cb4-7" tabindex="-1"></a><span class="co"># Installed at the system level?</span></span>
 <span id="cb4-8"><a href="#cb4-8" tabindex="-1"></a><span class="fu">font_family_exists</span>(<span class="st">&quot;sans&quot;</span>, <span class="at">system_only =</span> <span class="cn">TRUE</span>)</span>
 <span id="cb4-9"><a href="#cb4-9" tabindex="-1"></a><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
+<p>‘munch’ recognizes <code>cairo_pdf()</code>, but not
+<code>png(type = &quot;cairo&quot;)</code>: its device name, <code>&quot;png&quot;</code>,
+is the same as with other types. Set
+<code>options(munch.skip_device_check = TRUE)</code> to avoid the
+compatibility warning with this device.</p>
 </div>
-<div id="standard-r-devices-and-extrafont" class="section level3">
-<h3>Standard R devices and extrafont</h3>
-<p>Standard devices (<code>pdf()</code>, <code>png()</code>,
-<code>jpeg()</code>) use their own font engine and ignore ‘systemfonts’
-entirely.</p>
-<p>‘munch’ uses ‘gdtools’ (which relies on Cairo) for text measurement.
-The standard <code>pdf()</code> device uses its own font engine. For the
-output to be correct, the fonts used by ‘munch’ must also be known to
-<code>pdf()</code>.</p>
+<div id="bitmap-devices-png-and-jpeg" class="section level3">
+<h3>Bitmap devices <code>png()</code> and <code>jpeg()</code></h3>
+<p>With their default type, <code>png()</code> and <code>jpeg()</code>
+use the graphics engine of the system: Cairo on Linux (see above),
+Quartz on macOS, GDI on Windows. They find fonts installed at the system
+level, not fonts registered with ‘systemfonts’ only. Prefer
+<code>ragg::agg_png()</code> and <code>ragg::agg_jpeg()</code>, which
+are drop-in replacements.</p>
+</div>
+<div id="the-pdf-device-and-extrafont" class="section level3">
+<h3>The <code>pdf()</code> device and extrafont</h3>
+<p>The standard <code>pdf()</code> device uses its own font engine and
+ignores ‘systemfonts’ entirely.</p>
+<p>‘munch’ uses ‘gdtools’ (which reads the font files found by
+‘systemfonts’) for text measurement. For the output to be correct, the
+fonts used by ‘munch’ must also be known to <code>pdf()</code>.</p>
 <p>The ‘extrafont’ package bridges this gap: it imports TrueType fonts
 into R’s PDF device by generating font metric files that
 <code>pdf()</code> can use.</p>
@@ -486,22 +510,23 @@ match the rendering and the output will have positioning errors.</p>
 <span id="cb5-9"><a href="#cb5-9" tabindex="-1"></a>)</span>
 <span id="cb5-10"><a href="#cb5-10" tabindex="-1"></a></span>
 <span id="cb5-11"><a href="#cb5-11" tabindex="-1"></a>p <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(df, <span class="fu">aes</span>(x, y, <span class="at">label =</span> label)) <span class="sc">+</span></span>
-<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a>  <span class="fu">geom_label_md</span>(<span class="at">code_font_family =</span> <span class="st">&quot;Courier New&quot;</span>) <span class="sc">+</span></span>
-<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(<span class="at">base_family =</span> <span class="st">&quot;Arial&quot;</span>)</span>
-<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a></span>
-<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a><span class="co"># Make Arial and Courier New available to pdf()</span></span>
-<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a><span class="fu">library</span>(extrafont)</span>
-<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a><span class="co"># font_import()</span></span>
-<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a><span class="co"># Run font_import() once to scan system fonts,</span></span>
-<span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a><span class="co"># then loadfonts() in each session.</span></span>
-<span id="cb5-20"><a href="#cb5-20" tabindex="-1"></a><span class="fu">loadfonts</span>()</span>
-<span id="cb5-21"><a href="#cb5-21" tabindex="-1"></a></span>
-<span id="cb5-22"><a href="#cb5-22" tabindex="-1"></a><span class="co"># Suppress the device warning since we ensured font concordance</span></span>
-<span id="cb5-23"><a href="#cb5-23" tabindex="-1"></a><span class="fu">options</span>(<span class="at">munch.skip_device_check =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb5-24"><a href="#cb5-24" tabindex="-1"></a></span>
-<span id="cb5-25"><a href="#cb5-25" tabindex="-1"></a><span class="fu">pdf</span>(<span class="at">file =</span> <span class="st">&quot;munch-example.pdf&quot;</span>, <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">7</span>)</span>
-<span id="cb5-26"><a href="#cb5-26" tabindex="-1"></a><span class="fu">print</span>(p)</span>
-<span id="cb5-27"><a href="#cb5-27" tabindex="-1"></a><span class="fu">dev.off</span>()</span></code></pre></div>
+<span id="cb5-12"><a href="#cb5-12" tabindex="-1"></a>  <span class="co"># the theme font does not apply to geoms: set it in the geom too</span></span>
+<span id="cb5-13"><a href="#cb5-13" tabindex="-1"></a>  <span class="fu">geom_label_md</span>(<span class="at">family =</span> <span class="st">&quot;Arial&quot;</span>, <span class="at">code_font_family =</span> <span class="st">&quot;Courier New&quot;</span>) <span class="sc">+</span></span>
+<span id="cb5-14"><a href="#cb5-14" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(<span class="at">base_family =</span> <span class="st">&quot;Arial&quot;</span>)</span>
+<span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a></span>
+<span id="cb5-16"><a href="#cb5-16" tabindex="-1"></a><span class="co"># Make Arial and Courier New available to pdf()</span></span>
+<span id="cb5-17"><a href="#cb5-17" tabindex="-1"></a><span class="fu">library</span>(extrafont)</span>
+<span id="cb5-18"><a href="#cb5-18" tabindex="-1"></a><span class="co"># font_import()</span></span>
+<span id="cb5-19"><a href="#cb5-19" tabindex="-1"></a><span class="co"># Run font_import() once to scan system fonts,</span></span>
+<span id="cb5-20"><a href="#cb5-20" tabindex="-1"></a><span class="co"># then loadfonts() in each session.</span></span>
+<span id="cb5-21"><a href="#cb5-21" tabindex="-1"></a><span class="fu">loadfonts</span>()</span>
+<span id="cb5-22"><a href="#cb5-22" tabindex="-1"></a></span>
+<span id="cb5-23"><a href="#cb5-23" tabindex="-1"></a><span class="co"># Suppress the device warning since we ensured font concordance</span></span>
+<span id="cb5-24"><a href="#cb5-24" tabindex="-1"></a><span class="fu">options</span>(<span class="at">munch.skip_device_check =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb5-25"><a href="#cb5-25" tabindex="-1"></a></span>
+<span id="cb5-26"><a href="#cb5-26" tabindex="-1"></a><span class="fu">pdf</span>(<span class="at">file =</span> <span class="st">&quot;munch-example.pdf&quot;</span>, <span class="at">width =</span> <span class="dv">7</span>, <span class="at">height =</span> <span class="dv">7</span>)</span>
+<span id="cb5-27"><a href="#cb5-27" tabindex="-1"></a><span class="fu">print</span>(p)</span>
+<span id="cb5-28"><a href="#cb5-28" tabindex="-1"></a><span class="fu">dev.off</span>()</span></code></pre></div>
 <p>The steps are:</p>
 <ol style="list-style-type: decimal">
 <li><strong>Install fonts at the system level</strong>, both “Arial” and
@@ -518,10 +543,9 @@ ensured font concordance manually, the warning is no longer needed.</li>
 </ol>
 <blockquote>
 <p><strong>Note</strong>: <code>cairo_pdf()</code> is a simpler
-alternative. It uses Cairo for rendering (same engine as ‘gdtools’ for
-measurement), so system-installed fonts work without ‘extrafont’. Use
-<code>pdf()</code> + ‘extrafont’ only when <code>cairo_pdf()</code> is
-not available.</p>
+alternative. It finds system-installed fonts with fontconfig, so they
+work without ‘extrafont’. Use <code>pdf()</code> + ‘extrafont’ only when
+<code>cairo_pdf()</code> is not available.</p>
 </blockquote>
 </div>
 </div>
@@ -530,19 +554,19 @@ not available.</p>
 <h2>Font sources at a glance</h2>
 <table>
 <colgroup>
-<col width="15%" />
-<col width="15%" />
-<col width="31%" />
-<col width="18%" />
-<col width="19%" />
+<col width="13%" />
+<col width="13%" />
+<col width="27%" />
+<col width="35%" />
+<col width="9%" />
 </colgroup>
 <thead>
 <tr class="header">
 <th>Font source</th>
 <th>Measurement</th>
 <th>ragg / svglite / ggiraph</th>
-<th>Cairo devices</th>
-<th>pdf() / png()</th>
+<th>Cairo devices, <code>png()</code>, <code>jpeg()</code></th>
+<th><code>pdf()</code></th>
 </tr>
 </thead>
 <tbody>
@@ -597,15 +621,17 @@ Register it with <code>register_gfont()</code>, <code>font_set()</code>,
 or <code>systemfonts::register_font()</code>.</p></li>
 <li><p><strong>Is the font found by the device?</strong></p>
 <ul>
-<li><p>For Cairo devices:</p>
+<li><p>For Cairo devices, <code>png()</code> and
+<code>jpeg()</code>:</p>
 <div class="sourceCode" id="cb7"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" tabindex="-1"></a>gdtools<span class="sc">::</span><span class="fu">font_family_exists</span>(<span class="st">&quot;My Font&quot;</span>, <span class="at">system_only =</span> <span class="cn">TRUE</span>)</span></code></pre></div>
 <p>If <code>FALSE</code>: the font is not system-installed. Either
 install it at the OS level or switch to a ‘systemfonts’ device (ragg,
 svglite).</p></li>
 <li><p>For <code>pdf()</code>: check that
 <code>extrafont::fonts()</code> includes the family.</p></li>
-<li><p>For ragg/svglite/ggiraph: if step 1 passed, this always
-works.</p></li>
+<li><p>For ragg/svglite/ggiraph: if step 1 passed, this always works.
+With svglite and ggiraph, the browser that displays the SVG also needs
+the font (see above).</p></li>
 </ul></li>
 <li><p><strong>Do both sides find the <em>same</em> font?</strong> Even
 when both find a font, it may not be the same file (e.g. a different

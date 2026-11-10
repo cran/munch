@@ -222,6 +222,29 @@ test_that("get_image_info reads valid image", {
   expect_gt(result$height, 0)
 })
 
+test_that("get_image_info reads the dimensions from the file header", {
+  skip_if_not_installed("magick")
+  r_logo <- file.path(R.home("doc"), "html", "logo.jpg")
+  skip_if_not(file.exists(r_logo), "R logo not found")
+
+  expect_equal(
+    munch:::get_image_info(r_logo),
+    list(width = 100, height = 76)
+  )
+})
+
+test_that("get_image_info reads svg files with magick", {
+  skip_if_not_installed("magick")
+  svg <- file.path(R.home("doc"), "html", "Rlogo.svg")
+  skip_if_not(file.exists(svg), "R svg logo not found")
+
+  info <- magick::image_info(magick::image_read(svg))
+  expect_equal(
+    munch:::get_image_info(svg),
+    list(width = info$width, height = info$height)
+  )
+})
+
 test_that("read_image_raster returns NULL on NA path", {
   result <- munch:::read_image_raster(NA_character_)
 
@@ -241,7 +264,54 @@ test_that("read_image_raster reads valid image", {
 
   result <- munch:::read_image_raster(r_logo)
 
-  expect_true(inherits(result, "raster"))
+  expect_s3_class(result, "nativeRaster")
+})
+
+test_that("read_image_raster warns on an unreadable file", {
+  skip_if_not_installed("magick")
+  bad <- withr::local_tempfile(fileext = ".png")
+  writeLines("not an image", bad)
+
+  expect_warning(result <- munch:::read_image_raster(bad), "Failed to read")
+  expect_null(result)
+})
+
+test_that("an image is not decoded again when a grob is drawn again", {
+  skip_if_not_installed("magick")
+  path <- withr::local_tempfile(fileext = ".png")
+  magick::image_write(magick::image_blank(20, 10, "red"), path, format = "png")
+  gr <- md_grob(paste0("a ![](", path, ") b"))
+
+  find_raster <- function(x) {
+    Filter(function(z) inherits(z, "rastergrob"), grid::makeContent(x)$children)
+  }
+  first <- find_raster(gr)[[1]]$raster
+  second <- find_raster(gr)[[1]]$raster
+
+  expect_s3_class(first, "nativeRaster")
+  # tracemem() returns the address: same address, same raster
+  address <- function(x) {
+    res <- tracemem(x)
+    untracemem(x)
+    res
+  }
+  expect_identical(address(second), address(first))
+})
+
+test_that("an SVG image is rendered at the size it is drawn", {
+  skip_if_not_installed("magick")
+  skip_if_not_installed("rsvg")
+  path <- withr::local_tempfile(fileext = ".svg")
+  writeLines(
+    paste0(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">',
+      '<rect width="10" height="10" fill="red"/></svg>'
+    ),
+    path
+  )
+  raster <- munch:::read_image_raster(path, width = 1, height = 1)
+
+  expect_equal(dim(raster), c(72L, 72L))
 })
 
 test_that("has_magick returns logical", {
@@ -257,4 +327,170 @@ test_that("check_device_compatibility skips when option set", {
   withr::with_options(list(munch.skip_device_check = TRUE), {
     expect_invisible(munch:::check_device_compatibility())
   })
+})
+
+test_that("lines follow the rules of flextable::layout_lines()", {
+  make_chunks <- function(txt, width) {
+    data.frame(
+      txt = txt,
+      width = width,
+      height = 0.2,
+      ascent = 0.15,
+      descent = 0.05,
+      max_ascend = 0.16,
+      max_descend = 0.06,
+      is_newline = txt == "\n",
+      is_space = txt == " "
+    )
+  }
+  line_text <- function(lines) {
+    vapply(
+      lines,
+      function(line) paste(vapply(line$chunks, `[[`, "", "txt"), collapse = ""),
+      character(1)
+    )
+  }
+
+  chunks <- make_chunks(c("ab", " ", "cd"), c(1, .2, 1))
+  expect_equal(line_text(arrange_chunks_into_lines(chunks, 3)), "ab cd")
+  # the space that does not fit is dropped
+  expect_equal(
+    line_text(arrange_chunks_into_lines(chunks, 1.1)),
+    c("ab", "cd")
+  )
+
+  # consecutive line breaks give an empty line, with a height
+  chunks <- make_chunks(c("a", "\n", "\n", "b"), c(1, 0, 0, 1))
+  lines <- arrange_chunks_into_lines(chunks, NULL)
+  expect_equal(line_text(lines), c("a", "", "b"))
+  expect_equal(lines[[2]]$height, 0.2)
+  expect_equal(lines[[2]]$width, 0)
+
+  # spaces written after a line break are kept
+  chunks <- make_chunks(c("a", "\n", " ", "b"), c(1, 0, .2, 1))
+  expect_equal(
+    line_text(arrange_chunks_into_lines(chunks, NULL)),
+    c("a", " b")
+  )
+
+  # no text
+  lines <- arrange_chunks_into_lines(chunks[0, ], 3)
+  expect_length(lines, 1L)
+  expect_length(lines[[1]]$chunks, 0L)
+})
+
+# --- words wider than a line ---
+
+word_lines <- function(text, width, ...) {
+  chunks <- munch:::split_chunks_into_words(md_to_chunks(text, ...))
+  chunks <- munch:::calc_chunk_metrics(chunks)
+  chunks$.chunk_index <- seq_len(nrow(chunks))
+  munch:::arrange_chunks_into_lines(chunks, width)
+}
+word_line_text <- function(lines) {
+  vapply(
+    lines,
+    function(line) paste(vapply(line$chunks, `[[`, "", "txt"), collapse = ""),
+    character(1)
+  )
+}
+
+test_that("a word wider than a line is split, without hyphen", {
+  word <- strrep("abcdefghij", 5)
+  lines <- word_lines(word, 1)
+
+  expect_gt(length(lines), 1L)
+  expect_identical(paste(word_line_text(lines), collapse = ""), word)
+  widths <- vapply(lines, `[[`, numeric(1), "width")
+  expect_true(all(widths <= 1))
+})
+
+test_that("a word wider than a line starts on a new line", {
+  word <- strrep("b", 50)
+  lines <- word_line_text(word_lines(paste("a", word, "c"), 1))
+
+  expect_identical(lines[1], "a ")
+  expect_gt(nchar(lines[2]), 1L)
+  expect_identical(paste(lines[-1], collapse = ""), paste(word, "c"))
+})
+
+test_that("a word wider than a line gives no empty line when it comes first", {
+  word <- strrep("b", 50)
+
+  expect_gt(nchar(word_line_text(word_lines(word, 1))[1]), 1L)
+  lines <- word_line_text(word_lines(paste0("a  \n", word), 1))
+  expect_identical(lines[1], "a")
+  expect_gt(nchar(lines[2]), 1L)
+})
+
+test_that("a word that fits is not split", {
+  lines <- word_lines("short words stay as they are", 1)
+
+  texts <- unlist(strsplit(word_line_text(lines), " "))
+  expect_setequal(texts, c("short", "words", "stay", "as", "they", "are"))
+})
+
+test_that("a word is not split without maximum width", {
+  word <- strrep("a", 100)
+
+  expect_identical(word_line_text(word_lines(word, NULL)), word)
+})
+
+test_that("a character is not split from its combining mark", {
+  word <- strrep("e\u0301", 60)
+  lines <- word_lines(word, 1)
+
+  expect_gt(length(lines), 1L)
+  expect_identical(paste(word_line_text(lines), collapse = ""), word)
+  expect_true(all(startsWith(word_line_text(lines), "e\u0301")))
+})
+
+test_that("a character wider than a line stays on its own line", {
+  expect_identical(
+    word_line_text(word_lines("abc", 0.01)),
+    c("a", "b", "c")
+  )
+})
+
+test_that("a split word gives one text grob per line, with its properties", {
+  word <- strrep("abcdefghij", 5)
+  gr <- md_grob(paste0("**", word, "**"), width = 1)
+  children <- grid::makeContent(gr)$children
+  is_text <- vapply(children, inherits, logical(1), "text")
+  labels <- vapply(children[is_text], function(z) z$label, character(1))
+
+  expect_identical(paste(labels, collapse = ""), word)
+  expect_identical(
+    sum(is_text),
+    length(word_lines(paste0("**", word, "**"), 1))
+  )
+  # all children are kept: their names are unique
+  expect_equal(anyDuplicated(names(children)), 0L)
+  faces <- vapply(children[is_text], function(z) z$gp$font, numeric(1))
+  expect_true(all(faces == 2))
+  expect_lte(dim(gr)$width, 1)
+})
+
+test_that("a superscript and an image are not split", {
+  chunks <- flextable::as_paragraph(flextable::as_sup(strrep("a", 100)))[[1]]
+  gr <- chunks_grob(chunks, width = 0.5)
+  expect_gt(dim(gr)$width, 0.5)
+
+  skip_if_not_installed("magick")
+  path <- withr::local_tempfile(fileext = ".png")
+  magick::image_write(magick::image_blank(20, 10, "red"), path, format = "png")
+  gr <- md_grob(paste0("![](", path, ")"), width = 0.01)
+  children <- grid::makeContent(gr)$children
+  expect_length(children, 1L)
+  expect_s3_class(children[[1]], "rastergrob")
+})
+
+test_that("the split follows a width changed after the creation", {
+  gr <- md_grob(strrep("a", 200), width = 4)
+  height_large <- dim(gr)$height
+
+  gr$max_width <- 1
+
+  expect_gt(dim(gr)$height, height_large)
+  expect_lte(dim(gr)$width, 1)
 })

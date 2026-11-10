@@ -8,6 +8,8 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
+# R CMD check runs this code without knitr: pdf() can not draw Liberation Sans
+if (!isTRUE(getOption("knitr.in.progress"))) ragg::agg_capture()
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
@@ -24,7 +26,7 @@ library(munch)
 library(ggplot2)
 library(flextable)
 library(gdtools)
-font_set_liberation()
+fset <- font_set_liberation()
 set_theme(theme_minimal(base_family = "Liberation Sans", base_size = 11))
 ```
 
@@ -46,7 +48,7 @@ ggplot(mtcars, aes(mpg, wt)) +
   ) +
   theme(
     plot.title = element_md(size = 16),
-    plot.subtitle = element_md(size = 12),
+    plot.subtitle = element_md(size = 12, code_font_family = "Liberation Mono"),
     plot.caption = element_md(size = 9)
   )
 ```
@@ -66,6 +68,36 @@ ggplot(mtcars, aes(hp, mpg)) +
 
 > For advanced markdown rendering (images, spans, custom CSS), see also
 > `marquee::element_marquee()`.
+
+### Long titles
+
+Titles, subtitles and captions wrap to the width of their column, and the plot
+keeps the space they need:
+
+```{r long-title, message=FALSE, fig.height=3}
+long_title <- paste(
+  "A **long title** that needs several lines, because it is wider",
+  "than the *panel* of the plot"
+)
+
+p <- ggplot(mtcars, aes(mpg, wt)) +
+  geom_point() +
+  labs(title = long_title) +
+  theme(plot.title = element_md())
+p
+```
+
+With 'patchwork', or with a fixed aspect ratio such as `coord_fixed()`, this width
+is not known when the height of the title is computed. The text may need more lines
+than the space kept for it, and its first lines are cut. Set the maximum width of
+the text with `width`, in inches:
+
+```{r long-title-patchwork, message=FALSE, fig.height=3}
+library(patchwork)
+
+p <- p + theme(plot.title = element_md(width = 2.5))
+p | p
+```
 
 ## Advanced formatting with element_chunks()
 
@@ -204,6 +236,7 @@ ggplot(mtcars, aes(mpg, wt)) +
 | `angle` | Text rotation angle |
 | `lineheight` | Line height multiplier |
 | `margin` | Margins around text |
+| `width` | Maximum width of the text, in inches |
 
 ```{r layout-chunks, message=FALSE}
 chunks <- as_paragraph(
@@ -233,7 +266,8 @@ ggplot(mtcars, aes(mpg, wt)) +
   geom_text_md(
     data = annotations,
     aes(x = x, y = y, label = label),
-    size = 4
+    size = 4,
+    code_font_family = "Liberation Mono"
   )
 ```
 
@@ -272,7 +306,8 @@ ggplot(mtcars, aes(mpg, wt)) +
   geom_text_md(
     data = df,
     aes(x = x, y = y, label = label),
-    width = 2, hjust = 0, size = 3.5
+    width = 2, hjust = 0, size = 3.5,
+    code_font_family = "Liberation Mono"
   )
 ```
 
@@ -300,29 +335,23 @@ ggplot(mtcars, aes(mpg, wt)) +
 
 ## Alignment accuracy
 
-'munch' splits text into individually-styled chunks and measures
-each chunk width separately using 'gdtools'. The widths are then summed
-to obtain the total line width. This approach works well in most cases,
-but it does not produce the same result as a full text shaping engine
-such as textshaping or systemfonts. Those engines compute the width of
-a complete string and account for kerning pairs, ligatures, and glyph
-substitutions between adjacent characters, adjustments that are lost
-when characters belong to separate chunks. The summed width is close
-but not exact.
+'munch' measures text with 'gdtools', which adds up the advance widths of the
+glyphs read from the font file. Kerning, the adjustment of the space between
+some pairs of letters, is not applied. Devices such as 'ragg', 'svglite' or
+'ggiraph' apply it when they draw the text, so a word can be drawn slightly
+narrower than measured.
 
-The practical effect depends on the horizontal justification:
+The difference is negligible for most words, but can reach about 7% of the
+width of words with pairs such as "AV", "To" or "WA" (for example "AVATAR").
+Each word is placed at its measured position, so the differences do not add
+up along a line. Their visible effects are:
 
-- `hjust = 0` (left-aligned): unaffected. The left edge is always
-  anchored at x = 0, so any width discrepancy has no visible impact.
-- `hjust = 0.5` (centered): minor. The measurement error is split
-  equally on both sides.
-- `hjust = 1` (right-aligned): most visible. The right edge of
-  successive wrapped lines may not align precisely because each line
-  carries a slightly different measurement error.
+- a slightly wider space after such a word;
+- with `hjust = 1` (right-aligned), a line ending with such a word stops
+  slightly before the right edge; with `hjust = 0.5`, the difference is half
+  as large on each side; with `hjust = 0`, the left edge is exact.
 
-For best accuracy, prefer left or center alignment. Right alignment may show slight edge misalignment on multi-line text.
-
-This is a known limitation and work is in progress to reduce the gap.
+Taking kerning into account in measurements is planned.
 
 ## Choosing the right approach
 

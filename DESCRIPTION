@@ -1,6 +1,6 @@
 Package: munch
 Title: Rich Inline Text for 'grid' Graphics and 'flextable'
-Version: 0.0.2
+Version: 0.0.3
 Authors@R: c(
     person("David", "Gohel", , "david.gohel@ardata.fr", role = c("aut", "cre")),
     person("ArData", role = "cph")
@@ -14,18 +14,19 @@ Description: Renders rich inline text (bold, italic, code, links, images)
 License: MIT + file LICENSE
 URL: https://ardata-fr.github.io/munch/
 BugReports: https://github.com/ardata-fr/munch/issues
-Imports: cli, commonmark, flextable, patchwork, gdtools, ggplot2, grid,
-        methods, systemfonts, xml2
+Imports: cli, commonmark, flextable (>= 0.10.4), patchwork, gdtools (>=
+        0.5.3), ggplot2, grid, methods, officer (>= 0.7.8),
+        systemfonts, xml2
 Suggests: doconv, ggiraph, knitr, magick, ragg, rmarkdown, rsvg,
         svglite, testthat (>= 3.0.0), withr
 VignetteBuilder: knitr, rmarkdown
 Config/testthat/edition: 3
 Encoding: UTF-8
-RoxygenNote: 7.3.3
+Config/roxygen2/version: 8.1.1
 NeedsCompilation: no
-Packaged: 2026-04-09 09:48:14 UTC; davidgohel
+Packaged: 2026-11-10 08:42:03 UTC; davidgohel
 Author: David Gohel [aut, cre],
   ArData [cph]
 Maintainer: David Gohel <david.gohel@ardata.fr>
 Repository: CRAN
-Date/Publication: 2026-04-16 09:10:02 UTC
+Date/Publication: 2026-11-10 23:10:02 UTC

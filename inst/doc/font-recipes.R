@@ -29,6 +29,6 @@ library(gdtools)
 # Found by measurement (systemfonts + registry)?
 font_family_exists("sans")
 
-# Found by fontconfig (system-installed only)?
+# Installed at the system level?
 font_family_exists("sans", system_only = TRUE)
 

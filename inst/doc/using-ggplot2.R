@@ -1,4 +1,6 @@
 ## ----include = FALSE----------------------------------------------------------
+# R CMD check runs this code without knitr: pdf() can not draw Liberation Sans
+if (!isTRUE(getOption("knitr.in.progress"))) ragg::agg_capture()
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>",
@@ -14,7 +16,7 @@ library(munch)
 library(ggplot2)
 library(flextable)
 library(gdtools)
-font_set_liberation()
+fset <- font_set_liberation()
 set_theme(theme_minimal(base_family = "Liberation Sans", base_size = 11))
 
 ## ----md-titles, message=FALSE-------------------------------------------------
@@ -27,7 +29,7 @@ ggplot(mtcars, aes(mpg, wt)) +
   ) +
   theme(
     plot.title = element_md(size = 16),
-    plot.subtitle = element_md(size = 12),
+    plot.subtitle = element_md(size = 12, code_font_family = "Liberation Mono"),
     plot.caption = element_md(size = 9)
   )
 
@@ -42,6 +44,24 @@ ggplot(mtcars, aes(hp, mpg)) +
     axis.title.x = element_md(),
     axis.title.y = element_md()
   )
+
+## ----long-title, message=FALSE, fig.height=3----------------------------------
+long_title <- paste(
+  "A **long title** that needs several lines, because it is wider",
+  "than the *panel* of the plot"
+)
+
+p <- ggplot(mtcars, aes(mpg, wt)) +
+  geom_point() +
+  labs(title = long_title) +
+  theme(plot.title = element_md())
+p
+
+## ----long-title-patchwork, message=FALSE, fig.height=3------------------------
+library(patchwork)
+
+p <- p + theme(plot.title = element_md(width = 2.5))
+p | p
 
 ## ----chunks-overview, message=FALSE-------------------------------------------
 chunks <- as_paragraph(
@@ -147,7 +167,8 @@ ggplot(mtcars, aes(mpg, wt)) +
   geom_text_md(
     data = annotations,
     aes(x = x, y = y, label = label),
-    size = 4
+    size = 4,
+    code_font_family = "Liberation Mono"
   )
 
 ## ----geom-label-example, message=FALSE----------------------------------------
@@ -177,7 +198,8 @@ ggplot(mtcars, aes(mpg, wt)) +
   geom_text_md(
     data = df,
     aes(x = x, y = y, label = label),
-    width = 2, hjust = 0, size = 3.5
+    width = 2, hjust = 0, size = 3.5,
+    code_font_family = "Liberation Mono"
   )
 
 ## ----geom-label-image, message=FALSE, fig.height=3----------------------------

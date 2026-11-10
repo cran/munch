@@ -8,8 +8,12 @@ has_magick <- function() {
 
 #' Get image dimensions
 #'
-#' Reads an image file and returns its pixel dimensions.
-#' Requires the 'magick' package.
+#' Returns the pixel dimensions of an image file. The dimensions of 'png',
+#' 'jpeg' and 'gif' files are read from their header by
+#' `officer::image_dims()`, without decoding the image. 'svg' files are read
+#' with `magick::image_read()`, which does not need package 'rsvg' as
+#' `officer::image_dims()` does. The 'magick' package is still required, as it
+#' is used to draw the images.
 #'
 #' @param path Path to image file.
 #' @return List with width and height in pixels, or NULL if unreadable.
@@ -33,9 +37,13 @@ get_image_info <- function(path) {
 
   tryCatch(
     {
-      img <- magick::image_read(path)
-      info <- magick::image_info(img)
-      list(width = info$width, height = info$height)
+      if (grepl("\\.svg$", path, ignore.case = TRUE)) {
+        info <- magick::image_info(magick::image_read(path))
+        list(width = info$width, height = info$height)
+      } else {
+        dims <- officer::image_dims(path)
+        list(width = unname(dims[["width"]]), height = unname(dims[["height"]]))
+      }
     },
     error = function(e) {
       cli::cli_warn(c(
@@ -50,14 +58,15 @@ get_image_info <- function(path) {
 
 #' Read image as raster
 #'
-#' Reads an image file and returns a raster suitable
-#' for use with grid::rasterGrob().
+#' Returns a native raster suitable for use with grid::rasterGrob(). It comes
+#' from the cache of flextable, an image is only decoded once in a session.
 #' Requires the 'magick' package.
 #'
 #' @param path Path to image file.
-#' @return A raster object, or NULL if unreadable.
+#' @param width,height Size in inches at which an SVG file is rendered.
+#' @return A native raster, or NULL if unreadable.
 #' @noRd
-read_image_raster <- function(path) {
+read_image_raster <- function(path, width = NULL, height = NULL) {
   if (is.na(path) || !file.exists(path)) {
     return(NULL)
   }
@@ -67,10 +76,7 @@ read_image_raster <- function(path) {
   }
 
   tryCatch(
-    {
-      img <- magick::image_read(path)
-      grDevices::as.raster(img)
-    },
+    flextable::image_raster(path, width = width, height = height),
     error = function(e) {
       cli::cli_warn(c(
         "Failed to read image.",
