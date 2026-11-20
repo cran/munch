@@ -63,6 +63,58 @@ library(patchwork)
 p <- p + theme(plot.title = element_md(width = 2.5))
 p | p
 
+## ----md-ticks, message=FALSE, fig.height=3------------------------------------
+species <- aggregate(Sepal.Length ~ Species, data = iris, FUN = mean)
+
+ggplot(species, aes(Species, Sepal.Length)) +
+  geom_col(fill = "grey70") +
+  scale_x_discrete(
+    labels = c("*Iris setosa*", "*Iris versicolor*", "*Iris virginica*")
+  ) +
+  theme(axis.text.x = element_md(angle = 30, hjust = 1))
+
+## ----md-legend, message=FALSE, fig.height=3-----------------------------------
+ggplot(mtcars, aes(wt, mpg, colour = hp)) +
+  geom_point() +
+  labs(colour = "**Power**") +
+  scale_colour_continuous(labels = function(x) paste0("**", x, "** hp")) +
+  theme(
+    legend.title = element_md(),
+    legend.text = element_md()
+  )
+
+## ----md-legend-lines, message=FALSE, fig.height=3-----------------------------
+cyl_labels <- c(
+  "**4** cylinders",
+  "**6** cylinders",
+  "**8** cylinders  \n*the most powerful*"
+)
+
+p <- ggplot(mtcars, aes(wt, mpg, colour = factor(cyl))) +
+  geom_point() +
+  scale_colour_discrete(labels = cyl_labels) +
+  theme(legend.text = element_md())
+p
+
+## ----md-legend-spacing, message=FALSE, fig.height=3---------------------------
+p + theme(
+  legend.key.height = unit(0.5, "lines"),
+  legend.key.spacing.y = unit(4, "pt")
+)
+
+## ----md-all, message=FALSE, fig.height=3--------------------------------------
+ggplot(mtcars, aes(wt, mpg, colour = factor(am))) +
+  geom_point() +
+  facet_wrap(~ paste0("**", cyl, "** cylinders")) +
+  labs(
+    title = "*Weight* and **consumption**",
+    x = "Weight (*1000 lbs*)",
+    y = "Miles per gallon",
+    colour = "*Transmission*"
+  ) +
+  scale_colour_discrete(labels = c("**automatic**", "**manual**")) +
+  theme(text = element_md())
+
 ## ----chunks-overview, message=FALSE-------------------------------------------
 chunks <- as_paragraph(
   as_b("Bold"), as_chunk(", "),

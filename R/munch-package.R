@@ -2,7 +2,7 @@
 #'
 #' @description
 #' The 'munch' package renders rich inline text (bold, italic, code,
-#' links, images) in grid graphics and 'ggplot2', from markdown or
+#' links, images, equations) in grid graphics and 'ggplot2', from markdown or
 #' 'flextable' chunks.
 #'
 #' For 'ggplot2' integration, use [element_md()] and [element_chunks()] in
@@ -18,18 +18,37 @@
 #'
 #' Only graphics devices that support 'systemfonts' are compatible:
 #' 'ragg', 'svglite', or 'ggiraph'. The [cairo_pdf()] device is also
-#' supported when fonts are installed at the system level.
+#' supported when fonts are installed at the system level, except on
+#' Windows, where it does not apply the kerning of the fonts: words are
+#' drawn wider than measured.
 #' Standard R devices ([pdf()], [png()], [jpeg()]) are not compatible
 #' but can still produce correct output if fonts are made available
 #' to the device (e.g. via 'extrafont'). See `vignette("font-recipes")`
 #' for details.
 #'
-#' LaTeX and MathJax equations are not supported. For simple scientific
-#' notation, use `as_sup()` and `as_sub()` from 'flextable'.
+#' Equations, written `$...$` and `$$...$$` in markdown (as in Pandoc) or
+#' created with `flextable::as_equation()`, are drawn with the package
+#' 'equatags' (R >= 4.3); without it, their LaTeX source is written as text.
+#' A `$$...$$` equation is alone on its line, in display style. For simple
+#' scientific notation, `as_sup()` and `as_sub()` from 'flextable' are
+#' enough.
 #'
 #' Only inline formatting is supported: bold, italic, code, strikethrough,
-#' links, and images. Block elements such as headings, bullet lists, and
+#' links, images, superscripts (`^2^`), subscripts (`~2~`) and equations.
+#' Superscripts, subscripts and equations follow the markdown of Pandoc
+#' (R Markdown, Quarto). Block elements such as headings, bullet lists, and
 #' numbered lists are not available.
+#'
+#' @section Text format:
+#'
+#' The format of a text (size, font family, colour, bold, italic) comes from
+#' its chunk or its markdown, then from the element or the aesthetic and the
+#' 'ggplot2' theme, then from [flextable::set_flextable_defaults()]. An empty
+#' font family, the default of the themes, does not set the font: the font of
+#' the flextable defaults is used. Texts drawn by 'ggplot2' itself, such as
+#' axis labels, then use the default font of the device; give a font to the
+#' theme, for example `theme_minimal(base_family = "Liberation Sans")`, so
+#' that all texts of the plot use the same font.
 #'
 #' @section Options:
 #'
@@ -52,14 +71,15 @@
 #' @importFrom grid nullGrob widthDetails heightDetails rectGrob rasterGrob
 #' @importFrom grid vpStack unit.c unitType
 #' @importFrom gdtools strings_sizes
-#' @importFrom methods slot
 ## usethis namespace: end
 NULL
 
 #' Check if the current graphics device is compatible with munch
 #'
-#' Aborts if the current device is not known to support
-#' systemfonts (ragg, svglite, ggiraph, cairo_pdf).
+#' Warns if the current device is not known to support
+#' systemfonts (ragg, svglite, ggiraph, cairo_pdf), or if it is
+#' `cairo_pdf()` in a build of R without 'Pango', where words are drawn
+#' without the kerning applied by the measures.
 #'
 #' @return NULL invisibly.
 #' @noRd
@@ -82,8 +102,6 @@ check_device_compatibility <- function() {
     "devSVG",
     # ggiraph
     "dsvg_device",
-    # cairo
-    "cairo_pdf",
     # null device (for testing)
     "null device"
   )
@@ -97,7 +115,29 @@ check_device_compatibility <- function() {
     logical(1)
   ))
 
+  if (startsWith(dev_name, "cairo_pdf")) {
+    if (!cairo_has_pango()) {
+      cli::cli_warn(
+        c(
+          "!" = paste0(
+            "{.fun cairo_pdf} does not kern in this build of R ",
+            "(no {.pkg Pango}, as on Windows): words are drawn wider than ",
+            "{.pkg munch} measures them."
+          ),
+          "i" = "Recommended devices: {.pkg ragg}, {.pkg svglite}, {.pkg ggiraph}."
+        ),
+        .frequency = "once",
+        .frequency_id = "munch_device_cairo_kerning"
+      )
+    }
+    return(invisible(NULL))
+  }
+
   if (!is_compatible) {
+    recommended <- "{.pkg ragg}, {.pkg svglite}, {.pkg ggiraph}"
+    if (cairo_has_pango()) {
+      recommended <- paste0(recommended, ", {.fun cairo_pdf}")
+    }
     cli::cli_warn(
       c(
         "!" = paste0(
@@ -108,7 +148,7 @@ check_device_compatibility <- function() {
           "{.pkg munch} uses {.pkg systemfonts} and works best ",
           "with compatible devices."
         ),
-        "i" = "Recommended devices: {.pkg ragg}, {.pkg svglite}, {.pkg ggiraph}, {.fun cairo_pdf}."
+        "i" = paste0("Recommended devices: ", recommended, ".")
       ),
       .frequency = "once",
       .frequency_id = "munch_device_compat"
@@ -116,4 +156,15 @@ check_device_compatibility <- function() {
   }
 
   invisible(NULL)
+}
+
+#' Does R draw the text of Cairo devices with Pango?
+#'
+#' Without 'Pango' (Windows builds of R), Cairo devices draw text with the
+#' 'toy' interface of Cairo, which does not kern.
+#'
+#' @return A logical.
+#' @noRd
+cairo_has_pango <- function() {
+  isTRUE(nzchar(grDevices::grSoftVersion()["pango"]))
 }

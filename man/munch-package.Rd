@@ -7,7 +7,7 @@
 \title{munch: Rich Inline Text for Grid Graphics and Flextable}
 \description{
 The 'munch' package renders rich inline text (bold, italic, code,
-links, images) in grid graphics and 'ggplot2', from markdown or
+links, images, equations) in grid graphics and 'ggplot2', from markdown or
 'flextable' chunks.
 
 For 'ggplot2' integration, use \code{\link[=element_md]{element_md()}} and \code{\link[=element_chunks]{element_chunks()}} in
@@ -26,18 +26,39 @@ and custom colors not available in markdown).
 
 Only graphics devices that support 'systemfonts' are compatible:
 'ragg', 'svglite', or 'ggiraph'. The \code{\link[=cairo_pdf]{cairo_pdf()}} device is also
-supported when fonts are installed at the system level.
+supported when fonts are installed at the system level, except on
+Windows, where it does not apply the kerning of the fonts: words are
+drawn wider than measured.
 Standard R devices (\code{\link[=pdf]{pdf()}}, \code{\link[=png]{png()}}, \code{\link[=jpeg]{jpeg()}}) are not compatible
 but can still produce correct output if fonts are made available
 to the device (e.g. via 'extrafont'). See \code{vignette("font-recipes")}
 for details.
 
-LaTeX and MathJax equations are not supported. For simple scientific
-notation, use \code{as_sup()} and \code{as_sub()} from 'flextable'.
+Equations, written \verb{$...$} and \verb{$$...$$} in markdown (as in Pandoc) or
+created with \code{flextable::as_equation()}, are drawn with the package
+'equatags' (R >= 4.3); without it, their LaTeX source is written as text.
+A \verb{$$...$$} equation is alone on its line, in display style. For simple
+scientific notation, \code{as_sup()} and \code{as_sub()} from 'flextable' are
+enough.
 
 Only inline formatting is supported: bold, italic, code, strikethrough,
-links, and images. Block elements such as headings, bullet lists, and
+links, images, superscripts (\verb{^2^}), subscripts (\verb{~2~}) and equations.
+Superscripts, subscripts and equations follow the markdown of Pandoc
+(R Markdown, Quarto). Block elements such as headings, bullet lists, and
 numbered lists are not available.
+}
+
+\section{Text format}{
+
+
+The format of a text (size, font family, colour, bold, italic) comes from
+its chunk or its markdown, then from the element or the aesthetic and the
+'ggplot2' theme, then from \code{\link[flextable:set_flextable_defaults]{flextable::set_flextable_defaults()}}. An empty
+font family, the default of the themes, does not set the font: the font of
+the flextable defaults is used. Texts drawn by 'ggplot2' itself, such as
+axis labels, then use the default font of the device; give a font to the
+theme, for example \code{theme_minimal(base_family = "Liberation Sans")}, so
+that all texts of the plot use the same font.
 }
 
 \section{Options}{

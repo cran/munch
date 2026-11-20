@@ -2,7 +2,7 @@
 #' @description
 #' A ggplot2 geom for rendering markdown-formatted text. This geom is similar
 #' to [ggplot2::geom_text()] but supports basic markdown formatting
-#' (bold, italic, code, strikethrough, links, images).
+#' (bold, italic, code, strikethrough, links, images, equations).
 #'
 #' @inheritParams ggplot2::geom_text
 #' @param width Maximum width for text wrapping in inches. `NA` (default)
@@ -41,9 +41,14 @@
 #' - `~~strikethrough~~`
 #' - `[link](url)` (underlined and colored)
 #' - `![alt](path)` (images)
+#' - `^superscript^` and `~subscript~` (as in Pandoc)
+#' - `$...$` and `$$...$$` (LaTeX equations, drawn with 'equatags', see
+#'   [munch-package])
 #'
 #' Text properties (font size, family, color) are controlled by the
-#' `size`, `family`, and `colour` aesthetics respectively.
+#' `size`, `family`, and `colour` aesthetics respectively. As with
+#' [ggplot2::geom_text()], their default values come from the theme: its base
+#' size, font family and ink colour.
 #'
 #' @export
 #' @examplesIf require("ggiraph", quietly = TRUE, character.only = TRUE)
@@ -267,7 +272,7 @@ geom_text_md <- function(
   mapping = NULL,
   data = NULL,
   stat = "identity",
-  position = "identity",
+  position = "nudge",
   ...,
   width = NA,
   code_font_family = NULL,
@@ -304,15 +309,16 @@ GeomTextMd <- ggplot2::ggproto(
 
   required_aes = c("x", "y", "label"),
 
+  # as geom_text(): size, font and colour come from the theme
   default_aes = ggplot2::aes(
-    colour = "black",
-    size = 3.88,
+    colour = ggplot2::from_theme(colour %||% ink),
+    size = ggplot2::from_theme(fontsize),
     angle = 0,
     hjust = 0.5,
     vjust = 0.5,
     alpha = NA,
-    family = "",
-    lineheight = 1.2
+    family = ggplot2::from_theme(family),
+    lineheight = 1
   ),
 
   draw_panel = function(
@@ -364,7 +370,7 @@ GeomTextMd <- ggplot2::ggproto(
       # Create text properties
       props <- default_text_props(
         font_size = fontsize[i],
-        font_family = if (nzchar(row$family)) row$family else "sans",
+        font_family = theme_font_family(row$family),
         font_color = colour[i],
         code_font_family = code_font_family,
         line_spacing = row$lineheight
@@ -386,10 +392,14 @@ GeomTextMd <- ggplot2::ggproto(
       )
 
       # Handle rotation
+      # rotate the viewport of the text around its anchor; it keeps the size
+      # of the text, a viewport of the panel size moved the text away
       if (row$angle != 0) {
         gr$vp <- grid::viewport(
           x = grid::unit(row$x, "npc"),
           y = grid::unit(row$y, "npc"),
+          width = gr$vp$width,
+          height = gr$vp$height,
           angle = row$angle,
           just = c(row$hjust, row$vjust)
         )
@@ -438,7 +448,7 @@ makeContent.MdTextAutoWrapGrob <- function(x) {
 
     props <- default_text_props(
       font_size = x$fontsize[i],
-      font_family = if (nzchar(row$family)) row$family else "sans",
+      font_family = theme_font_family(row$family),
       font_color = x$colour[i],
       code_font_family = x$code_font_family,
       line_spacing = row$lineheight
@@ -455,10 +465,13 @@ makeContent.MdTextAutoWrapGrob <- function(x) {
       text_props = props
     )
 
+    # see draw_panel(): the rotated viewport keeps the size of the text
     if (row$angle != 0) {
       gr$vp <- grid::viewport(
         x = unit(row$x, "npc"),
         y = unit(row$y, "npc"),
+        width = gr$vp$width,
+        height = gr$vp$height,
         angle = row$angle,
         just = c(row$hjust, row$vjust)
       )
@@ -474,7 +487,7 @@ makeContent.MdTextAutoWrapGrob <- function(x) {
 #' @description
 #' A ggplot2 geom for rendering markdown-formatted text with a background
 #' rectangle, similar to [ggplot2::geom_label()]. Supports basic markdown
-#' formatting (bold, italic, code, strikethrough, links, images).
+#' formatting (bold, italic, code, strikethrough, links, images, equations).
 #' @inheritParams geom_text_md
 #' @param label.padding Amount of padding around label (defaults to 0.25 lines).
 #' @param label.r Radius of rounded corners (defaults to 0.15 lines).
@@ -509,7 +522,7 @@ geom_label_md <- function(
   mapping = NULL,
   data = NULL,
   stat = "identity",
-  position = "identity",
+  position = "nudge",
   ...,
   width = NA,
   code_font_family = NULL,
@@ -552,16 +565,17 @@ GeomLabelMd <- ggplot2::ggproto(
 
   required_aes = c("x", "y", "label"),
 
+  # as geom_label(): size, font and colour come from the theme
   default_aes = ggplot2::aes(
-    colour = "black",
-    fill = "white",
-    size = 3.88,
+    colour = ggplot2::from_theme(colour %||% ink),
+    fill = ggplot2::from_theme(fill %||% paper),
+    size = ggplot2::from_theme(fontsize),
     angle = 0,
     hjust = 0.5,
     vjust = 0.5,
     alpha = NA,
-    family = "",
-    lineheight = 1.2
+    family = ggplot2::from_theme(family),
+    lineheight = 1
   ),
 
   draw_panel = function(
@@ -612,7 +626,7 @@ GeomLabelMd <- ggplot2::ggproto(
       # Create text properties
       props <- default_text_props(
         font_size = fontsize[i],
-        font_family = if (nzchar(row$family)) row$family else "sans",
+        font_family = theme_font_family(row$family),
         font_color = text_colour[i],
         code_font_family = code_font_family,
         line_spacing = row$lineheight
@@ -681,11 +695,13 @@ GeomLabelMd <- ggplot2::ggproto(
         text_props = props
       )
 
-      # Override the viewport to position text with padding offset
+      # Override the viewport to position text with padding offset; lines
+      # are aligned within the wrapping width when given
+      text_w <- wrap_width %||% dims$width
       text_gr$vp <- grid::viewport(
         x = unit(row$x, "npc") + unit(x_offset, "inches"),
         y = unit(row$y, "npc") + unit(y_offset, "inches"),
-        width = unit(dims$width, "inches"),
+        width = unit(text_w, "inches"),
         height = unit(dims$height, "inches"),
         just = c(row$hjust, row$vjust)
       )
@@ -701,7 +717,7 @@ GeomLabelMd <- ggplot2::ggproto(
         text_gr$vp <- grid::viewport(
           x = unit(row$x, "npc") + unit(x_offset, "inches"),
           y = unit(row$y, "npc") + unit(y_offset, "inches"),
-          width = unit(dims$width, "inches"),
+          width = unit(text_w, "inches"),
           height = unit(dims$height, "inches"),
           angle = row$angle,
           just = c(row$hjust, row$vjust)

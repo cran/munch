@@ -290,30 +290,25 @@ test_that("resolve_text_unit errors on invalid unit", {
 # Default aesthetics tests --------------------------------------------------
 
 test_that("GeomTextMd has correct default aesthetics", {
+  # size, family and colour come from the theme, see the test below
   defaults <- GeomTextMd$default_aes
 
-  expect_equal(defaults$colour, "black")
-  expect_equal(defaults$size, 3.88)
   expect_equal(defaults$angle, 0)
   expect_equal(defaults$hjust, 0.5)
   expect_equal(defaults$vjust, 0.5)
   expect_true(is.na(defaults$alpha))
-  expect_equal(defaults$family, "")
-  expect_equal(defaults$lineheight, 1.2)
+  expect_equal(defaults$lineheight, 1)
 })
 
 test_that("GeomLabelMd has correct default aesthetics", {
+  # size, family and colour come from the theme, see the test below
   defaults <- GeomLabelMd$default_aes
 
-  expect_equal(defaults$colour, "black")
-  expect_equal(defaults$fill, "white")
-  expect_equal(defaults$size, 3.88)
   expect_equal(defaults$angle, 0)
   expect_equal(defaults$hjust, 0.5)
   expect_equal(defaults$vjust, 0.5)
   expect_true(is.na(defaults$alpha))
-  expect_equal(defaults$family, "")
-  expect_equal(defaults$lineheight, 1.2)
+  expect_equal(defaults$lineheight, 1)
 })
 
 test_that("GeomTextMd has correct required aesthetics", {
@@ -344,7 +339,7 @@ test_that("element_chunks stores chunks", {
   )
   el <- element_chunks(chunks)
 
-  expect_true("chunks" %in% names(el))
+  expect_true(S7::prop_exists(el, "chunks"))
   expect_s3_class(el$chunks, "paragraph")
 })
 
@@ -440,4 +435,65 @@ test_that("element_chunks accepts angle", {
     )
 
   expect_no_error(ggplot2::ggplotGrob(p))
+})
+
+test_that("default size, font, colour and fill come from the theme, as geom_text()", {
+  dat <- data.frame(x = 0, y = 0, label = "a")
+  th <- ggplot2::theme_grey(
+    base_size = 20,
+    base_family = "serif",
+    ink = "navy",
+    paper = "ivory"
+  )
+  aes_of <- function(geom) {
+    p <- ggplot2::ggplot(dat, ggplot2::aes(x, y, label = label)) + geom + th
+    ggplot2::layer_data(p)[intersect(
+      c("size", "family", "colour", "fill"),
+      names(ggplot2::layer_data(p))
+    )]
+  }
+  expect_equal(aes_of(geom_text_md()), aes_of(ggplot2::geom_text()))
+  expect_equal(aes_of(geom_label_md()), aes_of(ggplot2::geom_label()))
+  expect_equal(aes_of(geom_text_md())$size, 20 / ggplot2::.pt)
+})
+
+test_that("rotated texts are drawn around their point, as geom_text()", {
+  skip_if_not_installed("ragg")
+  gdtools::font_set_liberation()
+  withr::local_options(munch.skip_device_check = TRUE)
+  dat <- data.frame(x = 0, y = 0, label = "Hello")
+  red_box <- function(layer) {
+    red_ink_box(
+      ggplot2::ggplot(dat, ggplot2::aes(x, y, label = label)) +
+        layer +
+        ggplot2::xlim(-1, 1) +
+        ggplot2::ylim(-1, 1) +
+        ggplot2::theme_void(base_family = "Liberation Sans"),
+      width = 300,
+      height = 300
+    )
+  }
+  for (args in list(list(angle = 30), list(angle = 90, hjust = 0))) {
+    args$colour <- "red"
+    md <- red_box(do.call(geom_text_md, args))
+    txt <- red_box(do.call(ggplot2::geom_text, args))
+    expect_lte(max(abs(md - txt)), 3)
+  }
+})
+
+test_that("nudge_x and nudge_y move the labels, as in ggplot2", {
+  withr::local_options(munch.skip_device_check = TRUE)
+  dat <- data.frame(x = 0, y = 0, l = "a")
+  p <- ggplot2::ggplot(dat, ggplot2::aes(x, y, label = l))
+  where <- function(layer) {
+    unlist(ggplot2::layer_data(p + layer)[c("x", "y")])
+  }
+  expect_no_warning(
+    md <- where(geom_text_md(nudge_x = 0.3, nudge_y = 0.2))
+  )
+  expect_equal(md, where(ggplot2::geom_text(nudge_x = 0.3, nudge_y = 0.2)))
+  expect_equal(
+    where(geom_label_md(nudge_x = 0.3, nudge_y = 0.2)),
+    where(ggplot2::geom_label(nudge_x = 0.3, nudge_y = 0.2))
+  )
 })

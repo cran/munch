@@ -8,7 +8,8 @@
 #' @param hjust Horizontal justification (0=left, 0.5=center, 1=right).
 #' @param vjust Vertical justification (0=bottom, 0.5=center, 1=top).
 #' @param width Maximum width in inches (NULL for no wrapping).
-#' @param line_spacing Line height multiplier (default 1.2). When given, it
+#' @param line_spacing Line spacing, a multiple of the single line spacing
+#'   of the font, as in Word (default 1). When given, it
 #'   takes precedence over the `line_spacing` of `text_props`; when not given,
 #'   the value of `text_props` is used.
 #' @param text_props Text properties created with [default_text_props()].
@@ -26,7 +27,7 @@ md_grob <- function(
   hjust = 0.5,
   vjust = 0.5,
   width = NULL,
-  line_spacing = 1.2,
+  line_spacing = 1,
   text_props = NULL,
   name = NULL
 ) {
@@ -66,6 +67,13 @@ md_grob <- function(
   lines <- arrange_chunks_into_lines(chunks, width)
   total_height <- sum(sapply(lines, function(l) l$height))
   total_width <- max(sapply(lines, function(l) l$width))
+  # lines are aligned within `width` when given (see makeContent.mdGrob()):
+  # the viewport must have this width
+  vp_width <- if (!is.null(width) && is.numeric(width) && width > 0) {
+    width
+  } else {
+    total_width
+  }
 
   # Create grob with properly sized viewport
   gr <- gTree(
@@ -80,7 +88,7 @@ md_grob <- function(
     vp = viewport(
       x = unit(x, "npc"),
       y = unit(y, "npc"),
-      width = unit(total_width, "inches"),
+      width = unit(vp_width, "inches"),
       height = unit(total_height, "inches"),
       just = c(hjust, vjust)
     )
@@ -135,6 +143,25 @@ makeContent.mdGrob <- function(x) {
     current_x <- hjust * (container_w - line$width)
     for (j in seq_along(line$chunks)) {
       chunk <- line$chunks[[j]]
+
+      # Render equation chunks, on the baseline of the line
+      if (
+        !is.null(chunk$eq_data) &&
+          !is.na(chunk$eq_data) &&
+          nzchar(chunk$eq_data)
+      ) {
+        eq_grob <- equation_chunk_grob(
+          chunk,
+          x = current_x,
+          y = line_y,
+          name = paste0("equation_", chunk$.chunk_index)
+        )
+        if (!is.null(eq_grob)) {
+          line_grobs <- c(line_grobs, list(eq_grob))
+        }
+        current_x <- current_x + chunk$width
+        next
+      }
 
       # Render image chunks
       if (!is.null(chunk$img_path) && !is.na(chunk$img_path)) {
@@ -233,13 +260,9 @@ makeContent.mdGrob <- function(x) {
       # Use plain text label (no plotmath)
       label <- chunk$txt
 
-      # Compute Y position based on vertical alignment
-      text_y <- line_y
-      if (identical(chunk$vertical.align, "superscript")) {
-        text_y <- line_y + chunk$ascent * 0.4
-      } else if (identical(chunk$vertical.align, "subscript")) {
-        text_y <- line_y - chunk$descent * 0.2
-      }
+      # Superscripts and subscripts: baseline shifted (see
+      # calc_chunk_metrics())
+      text_y <- line_y + (chunk$baseline_shift %||% 0)
 
       # Create text grob
       txt_grob <- textGrob(
@@ -363,16 +386,37 @@ arrange_chunks_into_lines <- function(chunks, max_width = NULL) {
   attr(columns, "row.names") <- NULL
   chunk_at <- function(i) lapply(columns, `[`, i)
 
+  is_space <- chunks$is_space %in% TRUE
+  line_gap <- chunks$line_gap %||% rep(0, nrow(chunks))
+
   kept <- which(line_index > 0L)
-  lapply(unname(split(kept, line_index[kept])), function(index) {
+  lines <- unname(split(kept, line_index[kept]))
+  lapply(seq_along(lines), function(k) {
+    index <- lines[[k]]
     # a line with only a line break is an empty line: it gives the height
     drawn <- index[!is_newline[index]]
+    # as in Word, the spaces that end a line broken automatically are neither
+    # measured nor drawn: right-aligned lines end at the edge. A line ended by
+    # a line break of the text keeps its spaces, as they were written.
+    last <- max(index)
+    ended_by_newline <- any(is_newline[index]) ||
+      (last < length(is_newline) && is_newline[last + 1L])
+    if (k < length(lines) && !ended_by_newline) {
+      while (length(drawn) > 1L && is_space[drawn[length(drawn)]]) {
+        drawn <- drawn[-length(drawn)]
+      }
+    }
+    descent <- chunks$descent[index]
+    if (k == length(lines)) {
+      # the line spacing is between lines: no space below the last one
+      descent <- descent - line_gap[index]
+    }
     list(
       chunks = lapply(drawn, chunk_at),
       width = sum(chunks$width[drawn]),
-      height = max(chunks$ascent[index]) + max(chunks$descent[index]),
+      height = max(chunks$ascent[index]) + max(descent),
       ascent = max(chunks$ascent[index]),
-      descent = max(chunks$descent[index]),
+      descent = max(descent),
       max_ascend = max(chunks$max_ascend[index]),
       max_descend = max(chunks$max_descend[index])
     )
@@ -421,7 +465,8 @@ split_too_wide_words <- function(chunks, max_width) {
     fontname = chunks$font.family[is_piece],
     fontsize = chunks$font.size[is_piece],
     bold = chunks$bold[is_piece],
-    italic = chunks$italic[is_piece]
+    italic = chunks$italic[is_piece],
+    kerning = TRUE
   )$width
   chunks
 }
@@ -557,7 +602,8 @@ plot.mdGrob <- function(x, ...) {
 #' @param hjust Horizontal justification.
 #' @param vjust Vertical justification.
 #' @param width Maximum width in inches (NULL for no wrapping).
-#' @param line_spacing Line height multiplier.
+#' @param line_spacing Line spacing, a multiple of the single line spacing
+#'   of the font, as in Word (default 1).
 #' @param img_baseline_ratio Controls vertical alignment of inline images.
 #'   Specifies the proportion of the image height below the text baseline:
 #'   `0` = bottom at baseline, `0.15` = default, `0.35` = centered on text,
@@ -610,7 +656,7 @@ chunks_grob <- function(
   hjust = 0.5,
   vjust = 0.5,
   width = NULL,
-  line_spacing = 1.2,
+  line_spacing = 1,
   img_baseline_ratio = 0.15,
   name = NULL
 ) {
@@ -637,6 +683,13 @@ chunks_grob <- function(
   lines <- arrange_chunks_into_lines(chunks, width)
   total_height <- sum(sapply(lines, function(l) l$height))
   total_width <- max(sapply(lines, function(l) l$width))
+  # lines are aligned within `width` when given (see makeContent.mdGrob()):
+  # the viewport must have this width
+  vp_width <- if (!is.null(width) && is.numeric(width) && width > 0) {
+    width
+  } else {
+    total_width
+  }
 
   # Create grob with properly sized viewport
   gr <- gTree(
@@ -651,7 +704,7 @@ chunks_grob <- function(
     vp = viewport(
       x = unit(x, "npc"),
       y = unit(y, "npc"),
-      width = unit(total_width, "inches"),
+      width = unit(vp_width, "inches"),
       height = unit(total_height, "inches"),
       just = c(hjust, vjust)
     )

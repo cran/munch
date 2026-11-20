@@ -79,6 +79,22 @@ test_that("md_grob with max_width wraps text", {
   expect_gt(dims_wrap$height, dims_nowrap$height)
 })
 
+test_that("the viewport has the wrapping width, where lines are aligned", {
+  # lines are aligned within `width`: with a viewport as wide as the text,
+  # hjust > 0 moved the text out of its anchor and out of label boxes
+  for (hjust in c(0, 0.5, 1)) {
+    gr <- md_grob("Hello", hjust = hjust, width = 2)
+    expect_equal(grid::convertWidth(gr$vp$width, "inches", TRUE), 2)
+    expect_lt(dim(gr)$width, 2)
+  }
+  # without width, the viewport is as wide as the text
+  gr <- md_grob("Hello", hjust = 1)
+  expect_equal(
+    grid::convertWidth(gr$vp$width, "inches", TRUE),
+    dim(gr)$width
+  )
+})
+
 # --- dim.mdGrob empty ---
 
 test_that("dim.mdGrob returns zero for empty grob", {
@@ -282,6 +298,16 @@ test_that("an image is not decoded again when a grob is drawn again", {
   magick::image_write(magick::image_blank(20, 10, "red"), path, format = "png")
   gr <- md_grob(paste0("a ![](", path, ") b"))
 
+  # count the decodings of the file
+  image_read <- magick::image_read
+  n_read <- 0
+  local_mocked_bindings(
+    image_read = function(...) {
+      n_read <<- n_read + 1
+      image_read(...)
+    },
+    .package = "magick"
+  )
   find_raster <- function(x) {
     Filter(function(z) inherits(z, "rastergrob"), grid::makeContent(x)$children)
   }
@@ -289,13 +315,8 @@ test_that("an image is not decoded again when a grob is drawn again", {
   second <- find_raster(gr)[[1]]$raster
 
   expect_s3_class(first, "nativeRaster")
-  # tracemem() returns the address: same address, same raster
-  address <- function(x) {
-    res <- tracemem(x)
-    untracemem(x)
-    res
-  }
-  expect_identical(address(second), address(first))
+  expect_identical(second, first)
+  expect_equal(n_read, 1)
 })
 
 test_that("an SVG image is rendered at the size it is drawn", {
@@ -366,6 +387,18 @@ test_that("lines follow the rules of flextable::layout_lines()", {
   expect_equal(lines[[2]]$height, 0.2)
   expect_equal(lines[[2]]$width, 0)
 
+  # the space that fits but ends a line broken automatically is neither
+  # measured nor drawn, so that right-aligned lines end at the edge
+  chunks <- make_chunks(c("ab", " ", "cd"), c(1, .2, 1))
+  lines <- arrange_chunks_into_lines(chunks, 1.5)
+  expect_equal(line_text(lines), c("ab", "cd"))
+  expect_equal(lines[[1]]$width, 1)
+  # a line ended by a line break of the text keeps its spaces
+  chunks <- make_chunks(c("ab", " ", "\n", "cd"), c(1, .2, 0, 1))
+  lines <- arrange_chunks_into_lines(chunks, 3)
+  expect_equal(line_text(lines), c("ab ", "cd"))
+  expect_equal(lines[[1]]$width, 1.2)
+
   # spaces written after a line break are kept
   chunks <- make_chunks(c("a", "\n", " ", "b"), c(1, 0, .2, 1))
   expect_equal(
@@ -409,7 +442,8 @@ test_that("a word wider than a line starts on a new line", {
   word <- strrep("b", 50)
   lines <- word_line_text(word_lines(paste("a", word, "c"), 1))
 
-  expect_identical(lines[1], "a ")
+  # the space before the automatic line break is not drawn
+  expect_identical(lines[1], "a")
   expect_gt(nchar(lines[2]), 1L)
   expect_identical(paste(lines[-1], collapse = ""), paste(word, "c"))
 })
@@ -493,4 +527,19 @@ test_that("the split follows a width changed after the creation", {
 
   expect_gt(dim(gr)$height, height_large)
   expect_lte(dim(gr)$width, 1)
+})
+
+test_that("the line spacing is only between lines", {
+  gdtools::font_set_liberation()
+  height <- function(text, line_spacing) {
+    props <- default_text_props(font_family = "Liberation Sans", line_spacing = line_spacing)
+    dim(md_grob(text, text_props = props))$height
+  }
+  # one line: the line spacing has no effect, as in grid
+  expect_equal(height("Hello", 2), height("Hello", 1))
+  expect_equal(height("Hello", 0.9), height("Hello", 1))
+  # two lines: the space between them is multiplied, not the space below
+  one <- height("Hello", 1)
+  expect_equal(height("Hello  \nWorld", 2), 3 * one)
+  expect_equal(height("Hello  \nWorld", 1), 2 * one)
 })

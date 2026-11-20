@@ -7,19 +7,24 @@
 as_paragraph_md(x, font_family_mono = "mono")
 }
 \arguments{
-\item{x}{A character string containing markdown.}
+\item{x}{A character vector of markdown, one element per paragraph.}
 
 \item{font_family_mono}{Font family to use for inline code.
 Defaults to \code{"mono"}.}
 }
 \value{
-A paragraph object (class \code{"paragraph"}) that can be used
-with \code{\link[flextable:mk_par]{flextable::mk_par()}} or \code{\link[flextable:as_flextable]{flextable::as_flextable()}}.
+A paragraph object (class \code{"paragraph"}), with one paragraph per
+element of \code{x}, that can be used with \code{\link[flextable:mk_par]{flextable::mk_par()}} or
+\code{\link[flextable:as_flextable]{flextable::as_flextable()}}.
 }
 \description{
-Converts a markdown string to a paragraph object compatible
+Converts markdown strings to a paragraph object compatible
 with flextable. This allows using markdown syntax to format
 text in flextable cells.
+
+As \code{\link[flextable:as_paragraph]{flextable::as_paragraph()}}, it is vectorised: each element of \code{x}
+gives the paragraph of a row, so that a column of markdown can be used
+with \code{\link[flextable:mk_par]{flextable::mk_par()}} (\code{value = as_paragraph_md(col)}).
 }
 \details{
 Supported markdown syntax:
@@ -29,8 +34,14 @@ Supported markdown syntax:
 \item \code{`code`} (monospace)
 \item \verb{~~strikethrough~~}
 \item \verb{[link](url)} (underlined and colored)
-\item \verb{![alt](path)} (images)
+\item \verb{![alt](path)} (images, with a height of twice the font size, as in
+\code{\link[=md_grob]{md_grob()}}; an image that can not be read is dropped with a warning)
 \item Line breaks with \verb{\\n\\n} (paragraph) or two spaces + \verb{\\n} (hard break)
+\item \verb{^superscript^} and \verb{~subscript~}, as in Pandoc (no space inside, unless
+escaped: \verb{^a\\ b^})
+\item Equations \verb{$...$} and \verb{$$...$$} (LaTeX), as in Pandoc; \verb{\\$} is a
+dollar. They are written as equations of 'flextable'
+(\code{\link[flextable:as_equation]{flextable::as_equation()}}), which needs the package 'equatags'.
 }
 }
 \examples{

@@ -4,7 +4,8 @@
 #' using gdtools for accurate font metrics.
 #'
 #' @param chunks A md_chunk data.frame.
-#' @param line_spacing Line height multiplier (default 1.2).
+#' @param line_spacing Line spacing, a multiple of the single line spacing
+#'   of the font (default 1).
 #' @param img_baseline_ratio Proportion of image height below baseline (default 0.15).
 #'
 #' @return The chunks data.frame with added columns: width, height, ascent, descent.
@@ -13,7 +14,7 @@
 #' @importFrom systemfonts font_info
 calc_chunk_metrics <- function(
   chunks,
-  line_spacing = 1.2,
+  line_spacing = 1,
   img_baseline_ratio = 0.15
 ) {
   if (nrow(chunks) == 0) {
@@ -21,12 +22,17 @@ calc_chunk_metrics <- function(
     chunks$height <- numeric(0)
     chunks$ascent <- numeric(0)
     chunks$descent <- numeric(0)
+    chunks$line_gap <- numeric(0)
     chunks$max_ascend <- numeric(0)
     chunks$max_descend <- numeric(0)
+    chunks$baseline_shift <- numeric(0)
     chunks$is_newline <- logical(0)
     chunks$is_space <- logical(0)
     return(chunks)
   }
+
+  # Equations that can not be drawn are written as LaTeX source
+  chunks <- equations_as_text(chunks)
 
   # Normalize image columns from different sources
 
@@ -81,16 +87,19 @@ calc_chunk_metrics <- function(
   chunks$height <- 0
   chunks$ascent <- 0
   chunks$descent <- 0
+  chunks$line_gap <- 0
   chunks$max_ascend <- 0
   chunks$max_descend <- 0
+  chunks$baseline_shift <- 0
 
   # Mark special chunks
   chunks$is_newline <- !is.na(chunks$txt) & chunks$txt %in% c("\n", "\n\n")
   chunks$is_space <- !is.na(chunks$txt) & chunks$txt == " "
 
-  # Separate image vs text chunks
+  # Separate image, equation and text chunks
   is_img <- !is.na(chunks$img_path)
-  is_text <- !is_img
+  is_eq <- !is_img & is_equation_chunk(chunks)
+  is_text <- !is_img & !is_eq
 
   # --- Text metrics ---
   if (any(is_text)) {
@@ -98,30 +107,45 @@ calc_chunk_metrics <- function(
     txt_measure[chunks$is_newline[is_text]] <- "."
     txt_measure[is.na(txt_measure)] <- ""
 
+    # superscripts and subscripts are measured at their size
+    is_script_text <- chunks$vertical.align[is_text] %in%
+      c("superscript", "subscript")
+    measure_size <- chunks$font.size[is_text]
+    measure_size[is_script_text] <- measure_size[is_script_text] * script_size
+
+    # widths with the kerning of the fonts, as devices draw the words
     metrics <- gdtools::strings_sizes(
       x = txt_measure,
       fontname = chunks$font.family[is_text],
-      fontsize = chunks$font.size[is_text],
+      fontsize = measure_size,
       bold = chunks$bold[is_text],
-      italic = chunks$italic[is_text]
+      italic = chunks$italic[is_text],
+      kerning = TRUE
     )
 
     chunks$width[is_text] <- metrics$width
 
-    # Use font-level reference metrics for ascent/descent so that
-    # all lines in a wrapped block have uniform height. "Mg" covers
-    # the capital ascent and descender depth of the font.
-    ref_metrics <- gdtools::strings_sizes(
-      x = rep("Mg", sum(is_text)),
+    # Line metrics of the font, as Word uses them for single line spacing
+    # (gdtools::font_line_metrics()), so that all lines of a block have the
+    # same height and a line spacing of 1 gives the distance between lines
+    # of Word. As in Word, the space added by a line spacing larger than 1 is
+    # below the line: the part above the baseline does not change.
+    ref_metrics <- gdtools::font_line_metrics(
       fontname = chunks$font.family[is_text],
       fontsize = chunks$font.size[is_text],
       bold = chunks$bold[is_text],
       italic = chunks$italic[is_text]
     )
 
-    chunks$ascent[is_text] <- ref_metrics$ascent * line_spacing
-    chunks$descent[is_text] <- ref_metrics$descent * line_spacing
+    chunks$ascent[is_text] <- ref_metrics$ascent
+    chunks$descent[is_text] <- pmax(
+      ref_metrics$descent + (line_spacing - 1) * ref_metrics$line_height,
+      0
+    )
     chunks$height[is_text] <- (chunks$ascent[is_text] + chunks$descent[is_text])
+    # the space added below the line by the line spacing: not kept under the
+    # last line, so that the line spacing is only between lines, as in grid
+    chunks$line_gap[is_text] <- chunks$descent[is_text] - ref_metrics$descent
 
     # Font-level max glyph extents from systemfonts (used for highlight rects).
     # gdtools/Cairo ascent can be smaller than the actual glyph extent that
@@ -133,11 +157,28 @@ calc_chunk_metrics <- function(
     chunks$max_ascend[is_text] <- fi$max_ascend / 72
     chunks$max_descend[is_text] <- abs(fi$max_descend) / 72
 
-    # Adjust for superscript/subscript
+    # Superscripts and subscripts: drawn at their size, with their baseline
+    # shifted from the font size of the text around them (the height of
+    # the line does not change)
     is_ss <- is_text &
       (chunks$vertical.align %in% c("superscript", "subscript"))
-    chunks$width[is_ss] <- chunks$width[is_ss] * 0.75
-    chunks$font.size[is_ss] <- chunks$font.size[is_ss] * 0.75
+    chunks$baseline_shift[is_ss] <- script_shift[chunks$vertical.align[is_ss]] *
+      chunks$font.size[is_ss] /
+      72
+    chunks$font.size[is_ss] <- chunks$font.size[is_ss] * script_size
+  }
+
+  # --- Equation metrics ---
+  # Width, height above the baseline and depth below it, as images; the
+  # height of the line is the largest of its chunks (a fraction makes its
+  # line higher).
+  if (any(is_eq)) {
+    idx <- which(is_eq)
+    eq_metrics <- equation_metrics(chunks, idx)
+    chunks$width[idx] <- eq_metrics$width
+    chunks$ascent[idx] <- eq_metrics$height
+    chunks$descent[idx] <- eq_metrics$depth
+    chunks$height[idx] <- eq_metrics$height + eq_metrics$depth
   }
 
   # --- Image metrics ---
@@ -159,9 +200,9 @@ calc_chunk_metrics <- function(
       target_w <- chunks$img_width[idx]
 
       if (is.na(target_h) && is.na(target_w)) {
-        # Default: image height = 2x font size in inches
-        target_h <- chunks$font.size[idx] / 72 * 2
-        target_w <- target_h * aspect
+        size <- default_image_size(img_info, chunks$font.size[idx])
+        target_h <- size$height
+        target_w <- size$width
       } else if (is.na(target_w)) {
         target_w <- target_h * aspect
       } else if (is.na(target_h)) {
@@ -202,3 +243,9 @@ calc_fontface <- function(bold, italic) {
     1L
   }
 }
+
+# Size of superscripts and subscripts (share of the font size) and shift of
+# their baseline (share of the font size, positive up), as Word draws them
+# with Arial and Liberation Sans; the same values as flextable::gen_grob().
+script_size <- 0.65
+script_shift <- c(superscript = 0.34, subscript = -0.07)

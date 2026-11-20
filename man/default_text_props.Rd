@@ -10,7 +10,9 @@ default_text_props(
   font_color = NULL,
   code_font_family = NULL,
   line_spacing = NULL,
-  img_baseline_ratio = NULL
+  img_baseline_ratio = NULL,
+  bold = NULL,
+  italic = NULL
 )
 }
 \arguments{
@@ -23,7 +25,10 @@ default_text_props(
 \item{code_font_family}{Font family name for inline code (backticks).
 Defaults to \code{"mono"}.}
 
-\item{line_spacing}{Line height multiplier.}
+\item{line_spacing}{Line spacing, a multiple of the single line spacing
+of the font, as in Word: the distance between the baselines of two lines
+is \code{line_spacing} times the line height of the font
+(\code{\link[gdtools:font_line_metrics]{gdtools::font_line_metrics()}}).}
 
 \item{img_baseline_ratio}{Controls vertical alignment of inline images.
 Specifies the proportion of the image height that appears below the
@@ -34,6 +39,9 @@ text baseline:
 \item \code{0.35}: image centered on text vertical center
 \item \code{0.5}: image centered on baseline
 }}
+
+\item{bold, italic}{If \code{TRUE}, the text is bold or italic by default;
+markdown emphasis adds to it. Default \code{FALSE}.}
 }
 \value{
 A list of class \code{"text_props"} with elements:
@@ -44,6 +52,7 @@ A list of class \code{"text_props"} with elements:
 \item \code{code.font.family}: Font family for code
 \item \code{line_spacing}: Line height multiplier
 \item \code{img_baseline_ratio}: Image baseline alignment ratio
+\item \code{bold}, \code{italic}: default font face of the text
 }
 
 Some element names use dot separators (\code{font.size}, \code{font.family}, etc.)

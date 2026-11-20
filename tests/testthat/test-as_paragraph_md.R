@@ -71,3 +71,58 @@ test_that("as_paragraph_md chunk_index is sequential", {
 
   expect_equal(chunk_df$.chunk_index, seq_len(nrow(chunk_df)))
 })
+
+test_that("as_paragraph_md() gives images to flextable", {
+  skip_if_not_installed("magick")
+  logo <- file.path(R.home("doc"), "html", "logo.jpg")
+  p <- as_paragraph_md(paste0("A logo ![R](", logo, ") here"))
+  ch <- p[[1]]
+  expect_true(flextable:::is_paragraph(ch))
+  img <- which(!vapply(ch$img_data, is.null, NA))
+  expect_length(img, 1L)
+  expect_equal(ch$img_data[[img]], logo)
+  # twice the font size, with the aspect ratio of the file
+  dims <- officer::image_dims(logo)
+  expect_equal(ch$height[img], ch$font.size[img] / 72 * 2)
+  expect_equal(
+    ch$width[img] / ch$height[img],
+    unname(dims[["width"]] / dims[["height"]])
+  )
+  ft <- flextable::flextable(data.frame(a = 1))
+  ft <- flextable::mk_par(ft, j = "a", value = p)
+  expect_s3_class(ft, "flextable")
+})
+
+test_that("as_paragraph_md() drops images that can not be read", {
+  expect_warning(
+    p <- as_paragraph_md("A ![missing](no-such-file.png) image"),
+    "not found"
+  )
+  ch <- p[[1]]
+  expect_true(flextable:::is_paragraph(ch))
+  expect_true(all(vapply(ch$img_data, is.null, NA)))
+  expect_equal(paste(ch$txt, collapse = ""), "A  image")
+})
+
+test_that("as_paragraph_md() gives one paragraph per element", {
+  p <- as_paragraph_md(c("**a**", "*b*", NA))
+  expect_s3_class(p, "paragraph")
+  expect_length(p, 3)
+
+  # a column of markdown in mk_par(), as with flextable::as_paragraph()
+  dat <- data.frame(md = c("**a**", "*b*", "c"))
+  ft <- flextable::mk_par(
+    flextable::flextable(dat),
+    j = "md",
+    value = as_paragraph_md(md)
+  )
+  content <- ft$body$content$data
+  texts <- vapply(
+    seq_len(nrow(dat)),
+    function(i) paste(content[[i, 1]]$txt, collapse = ""),
+    character(1)
+  )
+  expect_identical(texts, c("a", "b", "c"))
+  expect_true(content[[1, 1]]$bold)
+  expect_true(content[[2, 1]]$italic)
+})

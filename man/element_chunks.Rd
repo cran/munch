@@ -14,7 +14,7 @@ element_chunks(
   margin = NULL,
   debug = FALSE,
   inherit.blank = FALSE,
-  width = NULL
+  width = NA_real_
 )
 }
 \arguments{
@@ -30,7 +30,8 @@ containing chunks such as \code{\link[flextable:as_chunk]{flextable::as_chunk()}
 
 \item{lineheight}{Line height multiplier.}
 
-\item{size}{font size}
+\item{size}{Font size in points of the chunks that do not set theirs. By
+default, the size of the theme.}
 
 \item{margin}{Margins around the text (use \code{\link[ggplot2:margin]{ggplot2::margin()}}).}
 
@@ -43,15 +44,22 @@ captions, which wrap to their available width by default. With 'patchwork' or a
 fixed aspect ratio, the available width is not known when the height of the
 title is computed: the text may need more lines than the space kept for it,
 and setting \code{width} solves this. It is ignored for rotated text and for text
-with an explicit position.}
+with an explicit position. \code{NA}, the default, sets no width.}
 }
 \value{
-An element of class \code{c("element_chunks", "element_text", "element")}.
+An S7 element of class \code{element_chunks}, which extends
+\code{\link[ggplot2:element_text]{ggplot2::element_text()}}.
 }
 \description{
 A theme element that renders 'flextable' chunks directly in plot titles,
 subtitles, captions, and other text positions. This allows using
 superscripts, subscripts, and other formatting not available in markdown.
+
+The format of each chunk comes from the chunk itself, for example
+\code{as_chunk(props = fp_text_lite(font.size = 14))}; what the chunk does not
+set comes from the theme (size, font family, colour and face, as for other
+texts of the plot, or \code{size} of the element), and what the theme does not
+set comes from \code{\link[flextable:set_flextable_defaults]{flextable::set_flextable_defaults()}}.
 }
 \examples{
 \dontshow{if (require("ggiraph", quietly = TRUE, character.only = TRUE)) withAutoprint(\{ # examplesIf}

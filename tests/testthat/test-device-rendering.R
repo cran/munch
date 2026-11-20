@@ -23,6 +23,35 @@ test_that("check_device_compatibility passes with ragg", {
   })
 })
 
+with_cairo_pdf <- function(code) {
+  # capabilities("cairo") is fixed when R is built; grSoftVersion() loads
+  # the cairo module of R, which fails on macOS without XQuartz
+  cairo_loads <- suppressWarnings(nzchar(grDevices::grSoftVersion()[["cairo"]]))
+  testthat::skip_if_not(cairo_loads, "the cairo module of R can not be loaded")
+  path <- tempfile(fileext = ".pdf")
+  grDevices::cairo_pdf(path)
+  on.exit({
+    dev.off()
+    unlink(path)
+  })
+  force(code)
+}
+
+test_that("cairo_pdf() is accepted when R draws its text with Pango", {
+  local_mocked_bindings(cairo_has_pango = function() TRUE)
+  with_cairo_pdf({
+    expect_no_warning(munch:::check_device_compatibility())
+  })
+})
+
+test_that("cairo_pdf() without Pango warns that it does not kern", {
+  local_mocked_bindings(cairo_has_pango = function() FALSE)
+  withr::local_options(rlib_warning_verbosity = "verbose")
+  with_cairo_pdf({
+    expect_warning(munch:::check_device_compatibility(), "does not kern")
+  })
+})
+
 # --- makeContent.mdGrob ---
 
 test_that("makeContent.mdGrob renders text", {
@@ -359,6 +388,36 @@ test_that("widthDetails.mdTitleGrob auto_wrap returns natural content width in i
   })
 })
 
+test_that("the width of a title includes its left and right margins", {
+  # legends size the column of their labels with this width; without the
+  # margins, the widest label wrapped and overflowed on the next key
+  with_ragg({
+    margin <- ggplot2::margin(0, 10, 0, 20, unit = "pt")
+    titles <- list(
+      ggplot2::element_grob(
+        element_md(size = 12, margin = margin),
+        label = "A legend label",
+        margin_x = TRUE,
+        margin_y = TRUE
+      ),
+      ggplot2::element_grob(
+        element_chunks(
+          flextable::as_paragraph(flextable::as_chunk("A legend label")),
+          margin = margin
+        ),
+        label = "",
+        margin_x = TRUE,
+        margin_y = TRUE
+      )
+    )
+    for (gr in titles) {
+      w <- grid::convertWidth(grid::widthDetails(gr), "pt", valueOnly = TRUE)
+      content_w <- grid::convertWidth(gr$content_w, "pt", valueOnly = TRUE)
+      expect_equal(w - content_w, 30, tolerance = 1e-6)
+    }
+  })
+})
+
 test_that("heightDetails.mdTitleGrob no auto_wrap", {
   with_ragg({
     el <- element_md(size = 12)
@@ -572,4 +631,263 @@ test_that("element_md with rotation renders in ggplot with ragg", {
 
     expect_no_error(print(p))
   })
+})
+
+test_that("element_chunks() takes the format of the chunks, then of the theme", {
+  with_ragg({
+    old <- flextable::set_flextable_defaults(
+      font.size = 10,
+      font.family = "Liberation Mono",
+      font.color = "black"
+    )
+    withr::defer(do.call(flextable::set_flextable_defaults, old))
+    chunks <- flextable::as_paragraph(
+      flextable::as_chunk("a"),
+      flextable::as_chunk(
+        "b",
+        props = officer::fp_text_lite(
+          font.size = 40,
+          font.family = "Liberation Sans",
+          color = "green",
+          bold = FALSE
+        )
+      )
+    )
+    title_chunks <- function(element, theme) {
+      theme <- theme + ggplot2::theme(plot.title = element)
+      el <- ggplot2::calc_element("plot.title", theme)
+      ggplot2::element_grob(el, label = "")$children[[1]]$chunks
+    }
+    th <- ggplot2::theme_minimal(
+      base_size = 20,
+      base_family = "Liberation Serif"
+    ) +
+      ggplot2::theme(
+        plot.title = ggplot2::element_text(colour = "red", face = "bold")
+      )
+
+    # the theme fills what the chunk does not set
+    ch <- title_chunks(element_chunks(chunks), th)
+    expect_equal(ch$font.size, c(24, 40))
+    expect_equal(ch$font.family, c("Liberation Serif", "Liberation Sans"))
+    expect_equal(ch$color, c("red", "green"))
+    expect_equal(ch$bold, c(TRUE, FALSE))
+
+    # size of the element before the theme
+    ch <- title_chunks(element_chunks(chunks, size = 30), th)
+    expect_equal(ch$font.size, c(30, 40))
+
+    # an empty family, the default of the themes, keeps the flextable default
+    ch <- title_chunks(element_chunks(chunks), ggplot2::theme_minimal())
+    expect_equal(ch$font.family, c("Liberation Mono", "Liberation Sans"))
+  })
+})
+
+test_that("an empty font family of the theme gives the flextable font", {
+  with_ragg({
+    old <- flextable::set_flextable_defaults(font.family = "Liberation Mono")
+    withr::defer(do.call(flextable::set_flextable_defaults, old))
+    th <- ggplot2::theme_minimal()
+    expect_identical(th$text$family, "")
+
+    drawn_families <- function(x) {
+      if (!is.null(x$chunks)) {
+        return(unique(x$chunks$font.family))
+      }
+      unique(unlist(lapply(x$children, drawn_families)))
+    }
+    title_family <- function(element) {
+      el <- ggplot2::calc_element(
+        "plot.title",
+        th + ggplot2::theme(plot.title = element)
+      )
+      drawn_families(ggplot2::element_grob(el, label = "a"))
+    }
+    expect_equal(title_family(element_md()), "Liberation Mono")
+    expect_equal(
+      title_family(element_chunks(flextable::as_paragraph("a"))),
+      "Liberation Mono"
+    )
+
+    dat <- data.frame(x = 0, y = 0, label = "a")
+    for (geom in list(geom_text_md(), geom_label_md())) {
+      p <- ggplot2::ggplot(dat, ggplot2::aes(x, y, label = label)) + geom + th
+      grob <- ggplot2::layer_grob(p)[[1]]
+      expect_equal(drawn_families(grob), "Liberation Mono")
+    }
+  })
+})
+
+test_that("titles are placed as element_text() titles", {
+  skip_if_not_installed("ragg")
+  gdtools::font_set_liberation()
+  withr::local_options(munch.skip_device_check = TRUE)
+  dat <- data.frame(x = c(1, 2), y = c(1, 2), g = c("aa", "bb"))
+  p <- ggplot2::ggplot(dat, ggplot2::aes(x, y, colour = g)) +
+    ggplot2::geom_point() +
+    ggplot2::labs(x = "X title", y = "Y title", colour = "A legend title") +
+    ggplot2::theme_grey(base_family = "Liberation Sans")
+  same_place <- function(slot, args) {
+    args$colour <- "red"
+    text <- red_ink_box(
+      p + ggplot2::theme(!!slot := do.call(ggplot2::element_text, args))
+    )
+    md <- red_ink_box(p + ggplot2::theme(!!slot := do.call(element_md, args)))
+    # horizontal place; vertical metrics follow Word and differ slightly
+    expect_lte(max(abs(md[1:2] - text[1:2])), 2, label = slot)
+  }
+  # hjust of axis titles, whose layout has the size of the text
+  same_place("axis.title.x", list(hjust = 1))
+  same_place("axis.title.x", list(hjust = 0))
+  # the title of a legend is not wrapped, even wider than the keys and labels
+  same_place("legend.title", list())
+  same_place("legend.title", list(hjust = 1))
+
+  # the y axis title is rotated: hjust moves it vertically
+  args <- list(colour = "red", hjust = 1)
+  text <- red_ink_box(
+    p + ggplot2::theme(axis.title.y = do.call(ggplot2::element_text, args))
+  )
+  md <- red_ink_box(
+    p + ggplot2::theme(axis.title.y = do.call(element_md, args))
+  )
+  expect_lte(max(abs(md[3:4] - text[3:4])), 2)
+})
+
+test_that("sets of labels are placed as element_text() labels", {
+  skip_if_not_installed("ragg")
+  gdtools::font_set_liberation()
+  withr::local_options(munch.skip_device_check = TRUE)
+  p <- ggplot2::ggplot(mtcars, ggplot2::aes(wt, mpg, colour = hp)) +
+    ggplot2::geom_point() +
+    ggplot2::theme_grey(base_family = "Liberation Sans")
+  same_place <- function(p, slot, args = list()) {
+    args$colour <- "red"
+    text <- red_ink_box(
+      p + ggplot2::theme(!!slot := do.call(ggplot2::element_text, args))
+    )
+    md <- red_ink_box(p + ggplot2::theme(!!slot := do.call(element_md, args)))
+    expect_lte(max(abs(md - text)), 2, label = slot)
+  }
+  # axis ticks: one call to element_grob() with a label per tick
+  same_place(p, "axis.text.x")
+  same_place(p, "axis.text.y")
+  same_place(p, "axis.text.y", list(margin = ggplot2::margin(r = 15)))
+  same_place(p, "axis.text.x", list(angle = 45, hjust = 1, vjust = 1))
+  same_place(p, "axis.text.x", list(angle = 90, hjust = 1, vjust = 0.5))
+  same_place(p + ggplot2::scale_x_continuous(breaks = 3), "axis.text.x")
+  # labels of colour bars and bins
+  same_place(p, "legend.text")
+  same_place(p + ggplot2::theme(legend.position = "bottom"), "legend.text")
+  same_place(p + ggplot2::guides(colour = ggplot2::guide_bins()), "legend.text")
+  # polar axes
+  same_place(p + ggplot2::coord_radial(), "axis.text.theta")
+  # properties that ggplot2 reads from S7 elements: the angle set by
+  # guide_axis(), the margin of the labels of polar axes
+  same_place(
+    p + ggplot2::guides(x = ggplot2::guide_axis(angle = 90)),
+    "axis.text.x"
+  )
+  bars <- ggplot2::ggplot(mtcars, ggplot2::aes(factor(cyl))) +
+    ggplot2::geom_bar() +
+    ggplot2::scale_x_discrete(labels = c("4 cyl", "6 cyl", "8 cyl")) +
+    ggplot2::coord_radial() +
+    ggplot2::theme_grey(base_family = "Liberation Sans")
+  same_place(bars, "axis.text.theta")
+})
+
+test_that("element_chunks() refuses sets of labels", {
+  withr::local_options(munch.skip_device_check = TRUE)
+  el <- element_chunks(flextable::as_paragraph("a"))
+  expect_error(
+    ggplot2::element_grob(el, label = c("1", "2"), x = grid::unit(1:2, "native")),
+    "can not label axis ticks"
+  )
+})
+
+test_that("legend labels are not wrapped", {
+  withr::local_options(munch.skip_device_check = TRUE)
+  gdtools::font_set_liberation()
+  label_height <- function(label) {
+    gr <- ggplot2::element_grob(
+      element_md(family = "Liberation Sans"),
+      label = label,
+      margin_x = TRUE,
+      margin_y = TRUE
+    )
+    gr$name <- "guide.label"
+    grDevices::pdf(NULL, width = 2, height = 2)
+    on.exit(grDevices::dev.off())
+    grid::convertHeight(grid::grobHeight(gr), "in", valueOnly = TRUE)
+  }
+  # wider than the device: one line, as with element_text()
+  expect_equal(label_height(strrep("blah ", 40)), label_height("blah"))
+})
+
+test_that("texts at an angle that is not a right angle are placed as element_text()", {
+  skip_if_not_installed("ragg")
+  gdtools::font_set_liberation()
+  withr::local_options(munch.skip_device_check = TRUE)
+  p <- ggplot2::ggplot(mtcars, ggplot2::aes(wt, mpg)) +
+    ggplot2::geom_point() +
+    ggplot2::labs(title = "Title", x = "X title") +
+    ggplot2::theme_grey(base_family = "Liberation Sans")
+  for (slot in c("plot.title", "axis.title.x")) {
+    for (hjust in c(0, 1)) {
+      args <- list(colour = "red", angle = 45, hjust = hjust)
+      text <- red_ink_box(
+        p + ggplot2::theme(!!slot := do.call(ggplot2::element_text, args))
+      )
+      md <- red_ink_box(p + ggplot2::theme(!!slot := do.call(element_md, args)))
+      # rotated around the anchor, in a cell of the rotated size
+      expect_lte(max(abs(md - text)), 3, label = paste(slot, hjust))
+    }
+  }
+})
+
+test_that("texts are placed at vjust in a cell higher than them", {
+  skip_if_not_installed("ragg")
+  gdtools::font_set_liberation()
+  withr::local_options(munch.skip_device_check = TRUE)
+  p <- ggplot2::ggplot(mtcars, ggplot2::aes(wt, mpg, colour = factor(cyl))) +
+    ggplot2::geom_point() +
+    ggplot2::theme_grey(base_family = "Liberation Sans")
+  same_place <- function(slot) {
+    args <- list(colour = "red")
+    text <- red_ink_box(
+      p + ggplot2::theme(!!slot := do.call(ggplot2::element_text, args))
+    )
+    md <- red_ink_box(p + ggplot2::theme(!!slot := do.call(element_md, args)))
+    expect_lte(max(abs(md - text)), 1, label = slot)
+  }
+  # the row of a legend has the height of the key, higher than the label
+  same_place("legend.text")
+})
+
+test_that("texts rotated by -90 degrees have the size of a vertical text", {
+  skip_if_not_installed("ragg")
+  gdtools::font_set_liberation()
+  withr::local_options(munch.skip_device_check = TRUE)
+  # ggplot2 rotates strip.text.y by -90 degrees
+  lab <- ggplot2::labeller(am = function(x) ifelse(x == 0, "automatic", "manual"))
+  p <- ggplot2::ggplot(mtcars, ggplot2::aes(wt, mpg)) +
+    ggplot2::geom_point() +
+    ggplot2::facet_grid(am ~ cyl, labeller = lab) +
+    ggplot2::theme_grey(base_family = "Liberation Sans")
+  strip_width <- function(p) {
+    ragg::agg_capture()
+    on.exit(grDevices::dev.off())
+    g <- ggplot2::ggplotGrob(p)
+    col <- g$layout$l[grep("strip-r", g$layout$name)[1]]
+    grid::convertWidth(g$widths[col], "pt", valueOnly = TRUE)
+  }
+  text <- strip_width(p)
+  md <- strip_width(p + ggplot2::theme(strip.text = element_md()))
+  chunks <- strip_width(
+    p + ggplot2::theme(strip.text.y = element_chunks(flextable::as_paragraph("automatic")))
+  )
+  # the width of one line, not the length of "automatic"; munch lines are
+  # slightly higher than those of element_text()
+  expect_lt(abs(md - text), 3)
+  expect_lt(abs(chunks - text), 3)
 })

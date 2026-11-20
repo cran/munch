@@ -10,7 +10,10 @@
 #' @param font_color Text color.
 #' @param code_font_family Font family name for inline code (backticks).
 #'   Defaults to `"mono"`.
-#' @param line_spacing Line height multiplier.
+#' @param line_spacing Line spacing, a multiple of the single line spacing
+#'   of the font, as in Word: the distance between the baselines of two lines
+#'   is `line_spacing` times the line height of the font
+#'   ([gdtools::font_line_metrics()]).
 #' @param img_baseline_ratio Controls vertical alignment of inline images.
 #'   Specifies the proportion of the image height that appears below the
 #'   text baseline:
@@ -18,6 +21,8 @@
 #'   - `0.15`: (default) similar to text descent proportions
 #'   - `0.35`: image centered on text vertical center
 #'   - `0.5`: image centered on baseline
+#' @param bold,italic If `TRUE`, the text is bold or italic by default;
+#'   markdown emphasis adds to it. Default `FALSE`.
 #'
 #' @return A list of class `"text_props"` with elements:
 #'   - `font.size`: Font size in points
@@ -26,6 +31,7 @@
 #'   - `code.font.family`: Font family for code
 #'   - `line_spacing`: Line height multiplier
 #'   - `img_baseline_ratio`: Image baseline alignment ratio
+#'   - `bold`, `italic`: default font face of the text
 #'
 #' Some element names use dot separators (`font.size`, `font.family`, etc.)
 #' for compatibility with 'flextable' conventions. Function parameters
@@ -56,7 +62,9 @@ default_text_props <- function(
   font_color = NULL,
   code_font_family = NULL,
   line_spacing = NULL,
-  img_baseline_ratio = NULL
+  img_baseline_ratio = NULL,
+  bold = NULL,
+  italic = NULL
 ) {
   # Get flextable defaults as base
   ft_defaults <- flextable::get_flextable_defaults()
@@ -66,8 +74,10 @@ default_text_props <- function(
     font.family = font_family %||% ft_defaults$font.family,
     font.color = font_color %||% ft_defaults$font.color,
     code.font.family = code_font_family %||% "mono",
-    line_spacing = line_spacing %||% 1.2,
-    img_baseline_ratio = img_baseline_ratio %||% 0.15
+    line_spacing = line_spacing %||% ft_defaults$line_spacing,
+    img_baseline_ratio = img_baseline_ratio %||% 0.15,
+    bold = isTRUE(bold),
+    italic = isTRUE(italic)
   )
 
   class(props) <- c("text_props", "list")
@@ -83,7 +93,25 @@ print.text_props <- function(x, ...) {
     "font_color: {.val {x$font.color}}",
     "code_font_family: {.val {x$code.font.family}}",
     "line_spacing: {.val {x$line_spacing}}",
-    "img_baseline_ratio: {.val {x$img_baseline_ratio}}"
+    "img_baseline_ratio: {.val {x$img_baseline_ratio}}",
+    "bold: {.val {isTRUE(x$bold)}}",
+    "italic: {.val {isTRUE(x$italic)}}"
   ))
   invisible(x)
+}
+
+#' Font family set by a theme or an aesthetic
+#'
+#' The themes of 'ggplot2' have an empty font family by default: it does not
+#' set the font, and the font of the flextable defaults is used, as for the
+#' other properties that the theme does not set.
+#'
+#' @param family A font family, possibly `NULL`, `NA` or `""`.
+#' @return The font family, or `NULL` when it does not set the font.
+#' @noRd
+theme_font_family <- function(family) {
+  if (length(family) != 1L || is.na(family) || !nzchar(family)) {
+    return(NULL)
+  }
+  family
 }

@@ -9,7 +9,7 @@ geom_text_md(
   mapping = NULL,
   data = NULL,
   stat = "identity",
-  position = "identity",
+  position = "nudge",
   ...,
   width = NA,
   code_font_family = NULL,
@@ -128,7 +128,7 @@ A ggplot2 layer that can be added to a plot.
 \description{
 A ggplot2 geom for rendering markdown-formatted text. This geom is similar
 to \code{\link[ggplot2:geom_text]{ggplot2::geom_text()}} but supports basic markdown formatting
-(bold, italic, code, strikethrough, links, images).
+(bold, italic, code, strikethrough, links, images, equations).
 }
 \details{
 The geom supports the following markdown syntax:
@@ -139,10 +139,15 @@ The geom supports the following markdown syntax:
 \item \verb{~~strikethrough~~}
 \item \verb{[link](url)} (underlined and colored)
 \item \verb{![alt](path)} (images)
+\item \verb{^superscript^} and \verb{~subscript~} (as in Pandoc)
+\item \verb{$...$} and \verb{$$...$$} (LaTeX equations, drawn with 'equatags', see
+\link{munch-package})
 }
 
 Text properties (font size, family, color) are controlled by the
-\code{size}, \code{family}, and \code{colour} aesthetics respectively.
+\code{size}, \code{family}, and \code{colour} aesthetics respectively. As with
+\code{\link[ggplot2:geom_text]{ggplot2::geom_text()}}, their default values come from the theme: its base
+size, font family and ink colour.
 }
 \section{Aesthetics}{
 
